@@ -56,7 +56,6 @@ class Cinch {
         //TODO: add font awesome? icon instead of image
         \add_menu_page('Options', 'Cinch', ADMIN_CAPABILITY, 'cinch', array(CINCH_CLASS, 'adminOptionsPage'), CINCH_URL.'/resources/cpticons/burn.png', 3);
         \add_submenu_page('cinch', 'Access Control', 'Access Control', ADMIN_CAPABILITY, 'cinch-access', array(CINCH_CLASS, 'adminAccessPage'));
-
     }
 
     /* Cinch administration - Settings */
@@ -64,15 +63,15 @@ class Cinch {
 
         $sections = array(
             '__cinch_options' => array(
-                'title' => 'Global Options',
+                'title' => 'Cinch Options',
                 'content' => '',
-                'page' => 'cinch'
+                'page' => 'cinch-options'
             ),
-            /*'cinch-wordpress-features' => array(
-                'title' => 'Wordpress Features',
-                'content' => null,
-                'page' => 'cinch'
-            )*/
+            '__cinch_wordpress_features' => array(
+                'title' => 'Disable Wordpress Features',
+                'content' => '',
+                'page' => 'cinch-disable-features'
+            )
         );
 
         /* Setup sections */
@@ -90,58 +89,59 @@ class Cinch {
                 'sanitize' => null,
                 'html' => function() {
 
+                        $optionId = 'developer_administrator_account';
+
                         if (($adminUsers = \get_users(array('role' => 'administrator', 'orderby' => 'registered'))) && !empty($adminUsers)) {
 
-                            echo '<select name="__cinch_options[developer_administrator_account]" id="__cinch_options[developer_administrator_account]">';
+                            echo '<select name="__cinch_options['.$optionId.']" id="__cinch_options['.$optionId.']">';
 
                             foreach ($adminUsers as $user) {
 
                                 $option = get_option('__cinch_options');
 
-                                echo '<option value="'.$user->data->ID.'" '.( $option['developer_administrator_account'] === $user->data->ID ? ' selected="selected"' : '').'>'
+                                echo '<option value="'.$user->data->ID.'" '.( $option[$optionId] === $user->data->ID ? ' selected="selected"' : '').'>'
                                     .$user->data->user_login.' ('.$user->data->user_email.')
                                     </option>'."\n";
                             }
 
                             echo '</select>';
 
-                        } else { echo '<em>No administrators were found!</em>'; }
+                        } else { echo '<em>'.__('No administrators were found!').'</em>'; }
 
                 },
-                'page' => 'cinch',
+                'page' => 'cinch-options',
                 'default' => '1'
             ),
-            /*array(
+            array(
                 'title' => 'Disable comments',
-                'group' => 'cinch-wordpress-features',
-                'id' => '__cinch__wordpress_features_comments',
+                'group' => '__cinch_wordpress_features',
+                'id' => '__cinch_wordpress_features',
                 'sanitize' => null,
                 'html' => function() {
 
-                    echo '<input type="checkbox" name="__cinch__wordpress_features_comments" id="__cinch__wordpress_features_comments" value="1">';
+                    $option = get_option('__cinch_wordpress_features');
+                    $optionId = 'comments';
+                    echo '<input type="checkbox" name="__cinch_wordpress_features['.$optionId.']" id="__cinch_wordpress_features['.$optionId.']" value="1"'.($option[$optionId] === '1' ? ' checked="checked"' : '').'>';
 
                 },
-                'page' => 'cinch',
+                'page' => 'cinch-disable-features',
                 'default' => '1'
             ),
             array(
                 'title' => 'Disable attachment pages',
-                'group' => 'cinch-wordpress-features',
-                'id' => '__cinch__wordpress_features_attachment_pages',
+                'group' => '__cinch_wordpress_features',
+                'id' => '__cinch_wordpress_features_attachment_pages',
                 'sanitize' => null,
                 'html' => function() {
 
-                    $option = get_option('__cinch__wordpress_features_attachment_pages');
-
-                    echo $option;
-
-                    echo '<input type="checkbox" name="__cinch__wordpress_features_attachment_pages" id="__cinch__wordpress_features_attachment_pages" value="1">';
+                    $option = get_option('__cinch_wordpress_features');
+                    $optionId = 'attachment_pages';
+                    echo '<input type="checkbox" name="__cinch_wordpress_features['.$optionId.']" id="__cinch_wordpress_features['.$optionId.']" value="1"'.($option[$optionId] === '1' ? ' checked="checked"' : '').'>';
 
                 },
-                'page' => 'cinch',
+                'page' => 'cinch-disable-features',
                 'default' => '1'
-            )*/
-
+            )
         );
 
         /* Setup fields */
