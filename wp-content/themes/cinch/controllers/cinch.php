@@ -57,27 +57,31 @@ class Cinch {
 
         return ((
             (isset($developer_account) && is_user_logged_in() && $user = wp_get_current_user())
-            && current_user_can(ADMIN_CAPABILITY) && $user->data->ID === $developer_account) ? true : false
+            && $user->data->ID === $developer_account) ? true : false
         );
     }
 
     /* Cinch admin UI functions */
     public static function menu() {
-        global $submenu;
 
         //TODO: add font awesome? icon instead of image
-        $optionsPage = \add_menu_page('Options', 'Cinch', ADMIN_CAPABILITY, 'cinch', array(CINCH_CLASS, 'adminOptionsPage'), CINCH_URL.'/resources/cpticons/drill.png', 3);
-        \add_submenu_page('cinch', 'Add-ons', 'Add-ons', ADMIN_CAPABILITY, 'cinch-addons', array(CINCH_CLASS, 'adminAddonsPage'));
 
-        /* Rename top level sub menu */
-        $submenu['cinch'][0][0] = 'Options';
+        if ((Cinch::isDeveloperAdmin())
+            || ((!Cinch::isDeveloperAdmin() && $cinchOptions = get_option('__cinch_options')) && $cinchOptions['allow_client_cinch'] === '1')) {
 
-        /* Add jQuery UI functions to admin head */
-        \add_action('load-'.$optionsPage, function() {
-            \wp_enqueue_script('jquery-ui-core');
-            \wp_enqueue_script('jquery-ui-selectable');
-        });
+            $optionsPage = \add_menu_page('Options', 'Cinch', ADMIN_CAPABILITY, 'cinch', array(CINCH_CLASS, 'adminOptionsPage'), CINCH_URL.'/resources/cpticons/drill.png', 3);
+            \add_submenu_page('cinch', 'Add-ons', 'Add-ons', ADMIN_CAPABILITY, 'cinch-addons', array(CINCH_CLASS, 'adminAddonsPage'));
 
+            /* Rename top level sub menu */
+            global $submenu;
+            $submenu['cinch'][0][0] = 'Options';
+
+            /* Add jQuery UI functions to admin head */
+            \add_action('load-'.$optionsPage, function() {
+                    \wp_enqueue_script('jquery-ui-core');
+                    \wp_enqueue_script('jquery-ui-selectable');
+            });
+        }
     }
 
     /* Enqueue admin CSS */
@@ -151,7 +155,7 @@ class Cinch {
                         }
 
                         /* Allow client access to cinch */
-                        $optionId = 'hide_cinch';
+                        $optionId = 'allow_client_cinch';
                         ?>
 
                         </td>
@@ -170,7 +174,10 @@ class Cinch {
 
                 },
                 'page' => 'cinch-options',
-                'default' => '1'
+                'default' => array(
+                    'developer_administrator_account' => '1',
+                    'allow_client_cinch' => '0'
+                )
             ),
 
             /* Disable Wordpress features */
@@ -251,7 +258,6 @@ class Cinch {
                         <script>jQuery(function($) { $('.cinch-access-control').selectable(); });</script>
 
                     <?php
-
                 },
                 'page' => 'cinch-access-control',
                 'default' => '1'
@@ -260,7 +266,11 @@ class Cinch {
 
         /* Setup fields */
         foreach($options as $option) {
-            //if (get_option($option['id']) == false) add_option($option['id'], $option['default']);
+            //TODO: add options on theme activate?
+            /*if (get_option($option['id']) == false) {
+                $default = (is_array($option['default']) ? serialize($option['default']) : $option['default']);
+                add_option($option['id'], $default);
+            }*/
             \add_settings_field($option['id'], __($option['title']), $option['html'], $option['page'], $option['group'], array('label_for' => $option['id']));
             \register_setting($option['group'], $option['id'], $option['sanitize']);
         }
@@ -291,20 +301,34 @@ class Cinch {
     }
 
     public static function accessControl() {
+        if (Cinch::accessControlCheck()) return true;
 
+        $data = array (
+            'message' => 'You do not have sufficient permissions to access this page.'
+        );
+
+        Cinch::view('admin-error', $data);
+        return false;
+    }
+
+    public function accessControlCheck() {
         $currentRequest = end(explode('/', add_query_arg(null, null)));
+
+        //echo $currentRequest;
 
         if (!Cinch::isDeveloperAdmin()) {
 
+            /* Check for Cinch request */
+            $cinchOptions = get_option('__cinch_options');
+            if (strstr($currentRequest, 'admin.php?page=cinch') && $cinchOptions['allow_client_cinch'] !== '1') return false;
+
             if ($currentRequest === 'edit.php') {
-
-                $data = array (
-                    'message' => 'You do not have sufficient permissions to access this page.'
-                );
-
-                Cinch::view('admin-error', $data);
+                return false;
             }
+
+            return true;
         }
+        return true;
     }
 
 }
