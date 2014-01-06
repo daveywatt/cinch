@@ -12,6 +12,7 @@ class Cinch {
     public function __construct() {
 
         /* Define constants */
+        define('CINCH_VERSION', '0.0.1');
         define('CINCH_URL', get_stylesheet_directory_uri());
         define('CINCH_DIR', get_stylesheet_directory());
         define('ADMIN_CAPABILITY', 'manage_options');
@@ -27,8 +28,14 @@ class Cinch {
         /* Create admin UI */
         \add_action('admin_menu', array(CINCH_CLASS, 'menu'));
 
+        /* Register admin CSS styles */
+        \add_action('admin_enqueue_scripts', array(CINCH_CLASS, 'adminStyles'));
+
         /* Register settings */
         \add_action('admin_init', array(CINCH_CLASS, 'adminSettings'));
+
+        /* Access control over-rides */
+        \add_action('admin_init', array(CINCH_CLASS, 'accessControl'));
     }
 
     /* Autoloader */
@@ -44,18 +51,38 @@ class Cinch {
 
     /* Check for developer administrator account */
     public function isDeveloperAdmin() {
+
+        $option = get_option('__cinch_options');
+        $developer_account = (isset($option['developer_administrator_account']) ? $option['developer_administrator_account'] : '1');
+
         return ((
             (isset($developer_account) && is_user_logged_in() && $user = wp_get_current_user())
-            && current_user_can(ADMIN_CAPABILITY) && $user->user_login === $developer_account) ? true : false
+            && current_user_can(ADMIN_CAPABILITY) && $user->data->ID === $developer_account) ? true : false
         );
     }
 
     /* Cinch admin UI functions */
     public static function menu() {
+        global $submenu;
 
         //TODO: add font awesome? icon instead of image
-        \add_menu_page('Options', 'Cinch', ADMIN_CAPABILITY, 'cinch', array(CINCH_CLASS, 'adminOptionsPage'), CINCH_URL.'/resources/cpticons/burn.png', 3);
-        \add_submenu_page('cinch', 'Access Control', 'Access Control', ADMIN_CAPABILITY, 'cinch-access', array(CINCH_CLASS, 'adminAccessPage'));
+        $optionsPage = \add_menu_page('Options', 'Cinch', ADMIN_CAPABILITY, 'cinch', array(CINCH_CLASS, 'adminOptionsPage'), CINCH_URL.'/resources/cpticons/drill.png', 3);
+        \add_submenu_page('cinch', 'Add-ons', 'Add-ons', ADMIN_CAPABILITY, 'cinch-addons', array(CINCH_CLASS, 'adminAddonsPage'));
+
+        /* Rename top level sub menu */
+        $submenu['cinch'][0][0] = 'Options';
+
+        /* Add jQuery UI functions to admin head */
+        \add_action('load-'.$optionsPage, function() {
+            \wp_enqueue_script('jquery-ui-core');
+            \wp_enqueue_script('jquery-ui-selectable');
+        });
+
+    }
+
+    /* Enqueue admin CSS */
+    public static function adminStyles($hook) {
+        if (strstr($hook,'page_cinch')) wp_enqueue_style('cinch-css', CINCH_URL.'/css/cinch-admin.css', array(), CINCH_VERSION);
     }
 
     /* Cinch administration - Settings */
@@ -63,14 +90,23 @@ class Cinch {
 
         $sections = array(
             '__cinch_options' => array(
-                'title' => 'Cinch Options',
+                'title' => '',
                 'content' => '',
                 'page' => 'cinch-options'
             ),
             '__cinch_wordpress_features' => array(
-                'title' => 'Disable Wordpress Features',
+                'title' => '',
                 'content' => '',
                 'page' => 'cinch-disable-features'
+            ),
+            '__cinch_access_control' => array(
+                'title' => 'Client Access Control',
+                'content' => function() {
+                        echo '<p>'.__('Select a menu page to disable client access to the relevant section.')."\n";
+                        echo '<br />Use the <strong>CTRL</strong> key (Windows) or <strong>CMD &#8984;</strong> key (Mac) to deselect or select multiple items.</p>';
+
+                    },
+                'page' => 'cinch-access-control'
             )
         );
 
@@ -82,64 +118,142 @@ class Cinch {
         /* Option fields */
         $options = array(
 
+            /* Cinch global options */
             array(
                 'title' => 'Developer account',
                 'group' => '__cinch_options',
                 'id' => '__cinch_options',
-                'sanitize' => null,
+                'sanitize' => '',
                 'html' => function() {
 
+                        $option = \get_option('__cinch_options');
+
+                        /* Developer administrator account select */
                         $optionId = 'developer_administrator_account';
 
                         if (($adminUsers = \get_users(array('role' => 'administrator', 'orderby' => 'registered'))) && !empty($adminUsers)) {
 
-                            echo '<select name="__cinch_options['.$optionId.']" id="__cinch_options['.$optionId.']">';
+                            ?>
 
-                            foreach ($adminUsers as $user) {
+                            <select name="__cinch_options[<?=$optionId?>]" id="__cinch_options[<?=$optionId?>]">
 
-                                $option = get_option('__cinch_options');
+                                <?php foreach ($adminUsers as $user) { ?>
+                                    <option value="<?=$user->data->ID?>"<?=($option[$optionId] === $user->data->ID ? ' selected="selected"' : '')?>>
+                                        <?=$user->data->user_login?> (<?=$user->data->user_email?>)
+                                    </option>
+                                <?php } ?>
 
-                                echo '<option value="'.$user->data->ID.'" '.( $option[$optionId] === $user->data->ID ? ' selected="selected"' : '').'>'
-                                    .$user->data->user_login.' ('.$user->data->user_email.')
-                                    </option>'."\n";
-                            }
+                            </select>
 
-                            echo '</select>';
+                            <?php } else { ?>
+                                <em><?=__('No administrators were found!')?></em>
+                            <?php
+                        }
 
-                        } else { echo '<em>'.__('No administrators were found!').'</em>'; }
+                        /* Allow client access to cinch */
+                        $optionId = 'hide_cinch';
+                        ?>
+
+                        </td>
+                        </tr>
+
+                        <tr valign="top">
+                            <th scope="row">
+                                <label for="__cinch_options[<?=$optionId?>]"><?=__('Allow client access to Cinch')?></label>
+                            </th>
+                            <td>
+                                <input type="checkbox" name="__cinch_options[<?=$optionId?>]" id="__cinch_options[<?=$optionId?>]" value="1"<?=($option[$optionId] == '1' ? ' checked="checked"' : '')?>>
+                            </td>
+                        </tr>
+
+                        <?php
 
                 },
                 'page' => 'cinch-options',
                 'default' => '1'
             ),
+
+            /* Disable Wordpress features */
             array(
                 'title' => 'Disable comments',
                 'group' => '__cinch_wordpress_features',
                 'id' => '__cinch_wordpress_features',
-                'sanitize' => null,
+                'sanitize' => 'intval',
                 'html' => function() {
 
-                    $option = get_option('__cinch_wordpress_features');
+                    $option = \get_option('__cinch_wordpress_features');
+
+                    /* Disable comments */
                     $optionId = 'comments';
-                    echo '<input type="checkbox" name="__cinch_wordpress_features['.$optionId.']" id="__cinch_wordpress_features['.$optionId.']" value="1"'.($option[$optionId] === '1' ? ' checked="checked"' : '').'>';
+                    ?>
+
+                    <input type="checkbox" name="__cinch_wordpress_features[<?=$optionId?>]" id="__cinch_wordpress_features[<?=$optionId?>]" value="1"<?=($option[$optionId] == '1' ? ' checked="checked"' : '')?>>
+
+                    </td>
+                    </tr>
+
+                    <?php $optionId = 'attachment_pages'; ?>
+
+                    <tr valign="top">
+                        <th scope="row">
+                            <label for="__cinch_options[<?=$optionId?>]"><?=__('Disable attachment pages')?></label>
+                        </th>
+                        <td>
+                            <input type="checkbox" name="__cinch_options[<?=$optionId?>]" id="__cinch_options[<?=$optionId?>]" value="1"<?=($option[$optionId] == '1' ? ' checked="checked"' : '')?>>
+                        </td>
+                    </tr>
+
+                    <?php
 
                 },
                 'page' => 'cinch-disable-features',
                 'default' => '1'
             ),
+
+            /* Access Control */
             array(
-                'title' => 'Disable attachment pages',
-                'group' => '__cinch_wordpress_features',
-                'id' => '__cinch_wordpress_features_attachment_pages',
-                'sanitize' => null,
+                'title' => 'Disable client access',
+                'group' => '__cinch_access_control',
+                'id' => '__cinch_access_control',
+                'sanitize' => '',
                 'html' => function() {
 
-                    $option = get_option('__cinch_wordpress_features');
-                    $optionId = 'attachment_pages';
-                    echo '<input type="checkbox" name="__cinch_wordpress_features['.$optionId.']" id="__cinch_wordpress_features['.$optionId.']" value="1"'.($option[$optionId] === '1' ? ' checked="checked"' : '').'>';
+                        global $menu;
+                        global $submenu;
+
+                        $option = \get_option('__cinch_access_control');
+                        ?>
+
+                        <div id="cinch-access-control">
+
+                            <?php foreach ($menu as $menuItem) { if ($menuItem[0] == '' || $menuItem[0] === 'Cinch') continue; ?>
+
+                                <ul class="cinch-access-control">
+
+                                    <li class="ui-widget-content top-item" data-pointer="<?=(strstr($menuItem[2], '.php') !== false ? $menuItem[2] : 'admin.php?page='.$menuItem[2])?>">
+                                        <?=preg_replace('/[0-9]+/', '', $menuItem[0])?>
+                                    </li>
+
+                                    <?php if (isset($submenu[$menuItem[2]])) foreach($submenu[$menuItem[2]] as $subMenuItem) { ?>
+
+                                        <li class="ui-widget-content sub-item" data-pointer="<?=(strstr($subMenuItem[2], '.php') !== false ? $subMenuItem[2] : 'admin.php?page='.$subMenuItem[2])?>">
+                                            <?=preg_replace('/[0-9]+/', '', $subMenuItem[0])?>
+                                        </li>
+
+                                    <?php } ?>
+
+                                </ul>
+
+                            <?php } ?>
+
+                        </div>
+
+                        <script>jQuery(function($) { $('.cinch-access-control').selectable(); });</script>
+
+                    <?php
 
                 },
-                'page' => 'cinch-disable-features',
+                'page' => 'cinch-access-control',
                 'default' => '1'
             )
         );
@@ -161,9 +275,9 @@ class Cinch {
         Cinch::view('admin-options', $data);
     }
 
-    /* Cinch administration - Access control page */
-    public static function adminAccessPage() {
-        echo 'ACCESS VIEW HERE';
+    /* Cinch administration - Addons page */
+    public static function adminAddonsPage() {
+        echo 'ADDONS VIEW HERE';
     }
 
     public static function view($fileName, $array = array()) {
@@ -174,6 +288,23 @@ class Cinch {
             }
 
         @include(CINCH_DIR.'/views/'.$fileName.'.php');
+    }
+
+    public static function accessControl() {
+
+        $currentRequest = end(explode('/', add_query_arg(null, null)));
+
+        if (!Cinch::isDeveloperAdmin()) {
+
+            if ($currentRequest === 'edit.php') {
+
+                $data = array (
+                    'message' => 'You do not have sufficient permissions to access this page.'
+                );
+
+                Cinch::view('admin-error', $data);
+            }
+        }
     }
 
 }

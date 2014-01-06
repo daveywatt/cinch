@@ -1,0 +1,47 @@
+body {
+    overflow: hidden;
+}
+
+#cinch-access-control {
+    width: 100%;
+    overflow: hidden;
+}
+
+.cinch-access-control {
+    float: left;
+    margin: 0 4% 20px 0;
+}
+
+.cinch-access-control li {
+    display: block;
+    padding: 8px 76px 8px 10px;
+    cursor: pointer;
+}
+
+.cinch-access-control:nth-of-type(6n) {
+    clear: left;
+}
+
+.cinch-access-control li.top-item {
+    background: #222;
+    color: #eee;
+    margin-bottom: 0;
+}
+
+.cinch-access-control li.sub-item {
+    font-size: 13px;
+    background: #333;
+    color: #bbb;
+    margin: 0;
+    padding: 8px 12px;
+}
+
+.cinch-access-control li.ui-selected,
+.cinch-access-control li.top-item.ui-selected ~ li.sub-item {
+    background: #FF0000;
+    color: #fff;
+}
+
+.cinch-access-control li.top-item.ui-selected ~ li.sub-item {
+    opacity: 0.75;
+}
