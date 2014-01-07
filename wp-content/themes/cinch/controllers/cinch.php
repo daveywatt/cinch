@@ -82,6 +82,25 @@ class Cinch {
                     \wp_enqueue_script('jquery-ui-selectable');
             });
         }
+
+        if (!Cinch::isDeveloperAdmin()) {
+
+            /* Filter menu items in access control restrictions */
+            global $menu, $submenu;
+            $accessControl = get_option('__cinch_access_control');
+
+            foreach ($menu as $menuKey => $menuItem) {
+                if (Cinch::array_key_exists_r($menuItem[2], $accessControl))
+                    unset($menu[$menuKey]);
+            }
+
+            foreach ($submenu as $subMenuKey => $subMenuItem) {
+                foreach ($subMenuItem as $subMenuChild) {
+                    if (Cinch::array_key_exists_r($subMenuChild[2], $accessControl))
+                        unset($submenu[$subMenuKey]);
+                }
+            }
+        }
     }
 
     /* Enqueue admin CSS */
@@ -241,14 +260,16 @@ class Cinch {
                                     <?php
                                     $topItemPointer = (strstr($menuItem[2], '.php') !== false ? $menuItem[2] : 'admin.php?page='.$menuItem[2]);
                                     $isActive = (Cinch::array_key_exists_r($topItemPointer, $option) ? true : false);
+                                    //TODO: Add renaming to menu elements
                                     ?>
 
                                     <li class="ui-widget-content top-item<?=($isActive ? ' ui-selected' : '')?>" data-pointer="<?=$topItemPointer?>">
-                                        <?=preg_replace('/[0-9]+/', '', $menuItem[0])?>
+                                        <span><?=trim(preg_replace('/[0-9]+/', '', strip_tags($menuItem[0])))?></span>
                                         <?=($isActive ? '<input type="hidden" name="'.$optionID.'[]['.$topItemPointer.']" id="'.$optionID.'[]['.$topItemPointer.']" value="true" />' : '')?>
                                     </li>
 
-                                    <?php if (isset($submenu[$menuItem[2]])) foreach($submenu[$menuItem[2]] as $subMenuItem) { ?>
+                                    <?php if (isset($submenu[$menuItem[2]]) && array_shift($submenu[$menuItem[2]]))
+                                        foreach($submenu[$menuItem[2]] as $subMenuItem) { ?>
 
                                         <?php
                                         $subItemPointer = (strstr($subMenuItem[2], '.php') !== false ? $subMenuItem[2] : 'admin.php?page='.$subMenuItem[2]);
@@ -256,7 +277,7 @@ class Cinch {
                                         ?>
 
                                         <li class="ui-widget-content sub-item<?=($isActive ? ' ui-selected' : '')?>" data-pointer="<?=$subItemPointer?>">
-                                            <?=preg_replace('/[0-9]+/', '', $subMenuItem[0])?>
+                                            <span><?=trim(preg_replace('/[0-9]+/', '', strip_tags($subMenuItem[0])))?></span>
                                             <?=($isActive ? '<input type="hidden" name="'.$optionID.'[]['.$subItemPointer.']" id="'.$optionID.'[]['.$subItemPointer.']" value="true" />' : '')?>
                                         </li>
 
@@ -270,6 +291,7 @@ class Cinch {
 
                         <script>
                             jQuery(function($) {
+
                                 $('.cinch-access-control').selectable({
                                     selected: function(event, ui) {
                                         var pointer = '__cinch_access_control[]['+$(ui.selected).attr('data-pointer')+']';
@@ -277,6 +299,30 @@ class Cinch {
                                     },
                                     unselected: function(event, ui) {
                                         $(ui.unselected).find('input').remove();
+                                    }
+                                });
+
+                                var renameActive = false;
+                                $('.cinch-access-control li span').dblclick(function(e) {
+
+                                    e.preventDefault();
+                                    var currentName = $(this).html(),
+                                        contElem = $(this),
+                                        fillWidth = contElem.parent().width(),
+                                        padding = parseInt(contElem.css('padding-left'))+parseInt(contElem.css('padding-right'));
+
+                                    $('.cinch-access-control li span input').blur();
+
+                                    if (!renameActive) {
+
+                                        renameActive = true;
+                                        $(this).parent().removeClass('ui-selected');
+                                        $(this).addClass('renaming').html('').append('<input type="text" value="'+currentName+'" />');
+                                        $(this).find('input').css({width:fillWidth+'px'}).focus().select().bind('blur', function() {
+                                            var newVal = ($(this).val().length > 0 ? $(this).val() : currentName);
+                                            contElem.removeClass('renaming').html(newVal);
+                                            renameActive = false;
+                                        });
                                     }
                                 });
                             });
@@ -333,7 +379,6 @@ class Cinch {
         $data = array (
             'message' => 'You do not have sufficient permissions to access this page.'
         );
-
         Cinch::view('admin-error', $data);
         return false;
     }
@@ -341,18 +386,16 @@ class Cinch {
     public function accessControlCheck() {
         $currentRequest = end(explode('/', add_query_arg(null, null)));
 
-        //echo $currentRequest;
-
         if (!Cinch::isDeveloperAdmin()) {
 
             /* Check for Cinch request */
             $cinchOptions = get_option('__cinch_options');
             if (strstr($currentRequest, 'admin.php?page=cinch') && $cinchOptions['allow_client_cinch'] !== '1') return false;
 
-            if ($currentRequest === 'edit.php') {
-                return false;
-            }
+            /* Check for access control blocked pages */
+            $accessControl = get_option('__cinch_access_control');
 
+            if (Cinch::array_key_exists_r($currentRequest, $accessControl)) return false;
             return true;
         }
         return true;
@@ -364,6 +407,10 @@ class Cinch {
         return false;
     }
 
+    public static function in_array_r($needle, $haystack) {
+        foreach ($haystack as $item) if (in_array($needle, $item)) return true;
+        return false;
+    }
 }
 
 global $cinch;

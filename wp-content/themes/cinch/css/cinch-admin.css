@@ -14,8 +14,28 @@ body {
 
 .cinch-access-control li {
     display: block;
-    padding: 8px 76px 8px 10px;
     cursor: pointer;
+}
+
+.cinch-access-control li span {
+    display: block;
+    padding: 8px 76px 8px 10px;
+}
+
+.cinch-access-control li span.renaming {
+    padding: 0 !important;
+}
+
+.cinch-access-control li span input {
+    width: auto;
+    height: 32px;
+    margin: 0;
+    padding: 8px 76px 8px 10px;
+    border: none;
+    background: transparent;
+    font-size: inherit;
+    -webkit-appearance: none;
+    color: inherit;
 }
 
 .cinch-access-control:nth-of-type(6n) {
@@ -33,6 +53,13 @@ body {
     background: #333;
     color: #bbb;
     margin: 0;
+}
+
+.cinch-access-control li.sub-item span {
+    padding: 8px 12px;
+}
+
+.cinch-access-control li.sub-item span input {
     padding: 8px 12px;
 }
 
