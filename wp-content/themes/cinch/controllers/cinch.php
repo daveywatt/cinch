@@ -228,7 +228,8 @@ class Cinch {
                         global $menu;
                         global $submenu;
 
-                        $option = \get_option('__cinch_access_control');
+                        $optionID = '__cinch_access_control';
+                        $option = \get_option($optionID);
                         ?>
 
                         <div id="cinch-access-control">
@@ -237,14 +238,26 @@ class Cinch {
 
                                 <ul class="cinch-access-control">
 
-                                    <li class="ui-widget-content top-item" data-pointer="<?=(strstr($menuItem[2], '.php') !== false ? $menuItem[2] : 'admin.php?page='.$menuItem[2])?>">
+                                    <?php
+                                    $topItemPointer = (strstr($menuItem[2], '.php') !== false ? $menuItem[2] : 'admin.php?page='.$menuItem[2]);
+                                    $isActive = (Cinch::array_key_exists_r($topItemPointer, $option) ? true : false);
+                                    ?>
+
+                                    <li class="ui-widget-content top-item<?=($isActive ? ' ui-selected' : '')?>" data-pointer="<?=$topItemPointer?>">
                                         <?=preg_replace('/[0-9]+/', '', $menuItem[0])?>
+                                        <?=($isActive ? '<input type="hidden" name="'.$optionID.'[]['.$topItemPointer.']" id="'.$optionID.'[]['.$topItemPointer.']" value="true" />' : '')?>
                                     </li>
 
                                     <?php if (isset($submenu[$menuItem[2]])) foreach($submenu[$menuItem[2]] as $subMenuItem) { ?>
 
-                                        <li class="ui-widget-content sub-item" data-pointer="<?=(strstr($subMenuItem[2], '.php') !== false ? $subMenuItem[2] : 'admin.php?page='.$subMenuItem[2])?>">
+                                        <?php
+                                        $subItemPointer = (strstr($subMenuItem[2], '.php') !== false ? $subMenuItem[2] : 'admin.php?page='.$subMenuItem[2]);
+                                        $isActive = (Cinch::array_key_exists_r($subItemPointer, $option) ? true : false);
+                                        ?>
+
+                                        <li class="ui-widget-content sub-item<?=($isActive ? ' ui-selected' : '')?>" data-pointer="<?=$subItemPointer?>">
                                             <?=preg_replace('/[0-9]+/', '', $subMenuItem[0])?>
+                                            <?=($isActive ? '<input type="hidden" name="'.$optionID.'[]['.$subItemPointer.']" id="'.$optionID.'[]['.$subItemPointer.']" value="true" />' : '')?>
                                         </li>
 
                                     <?php } ?>
@@ -255,7 +268,21 @@ class Cinch {
 
                         </div>
 
-                        <script>jQuery(function($) { $('.cinch-access-control').selectable(); });</script>
+                        <script>
+                            jQuery(function($) {
+                                $('.cinch-access-control').selectable({
+                                    selected: function(event, ui) {
+                                        var pointer = '__cinch_access_control[]['+$(ui.selected).attr('data-pointer')+']';
+                                        $(ui.selected).append('<input type="hidden" name="'+pointer+'" id="'+pointer+'" value="true" />');
+                                    },
+                                    unselected: function(event, ui) {
+                                        $(ui.unselected).find('input').remove();
+                                    }
+                                });
+                            });
+                        </script>
+
+                        <?php echo '<pre>'; print_r($option); echo '</pre>'; ?>
 
                     <?php
                 },
@@ -329,6 +356,12 @@ class Cinch {
             return true;
         }
         return true;
+    }
+
+    /* Utility functions */
+    public static function array_key_exists_r($needle, $haystack) {
+        foreach ($haystack as $item) if (array_key_exists($needle, $item)) return true;
+        return false;
     }
 
 }
