@@ -253,12 +253,13 @@ class Cinch {
 
                         /* Build sorted menu */
                         $menuOperator = array();
-                        foreach ($menu as $menuPosition => $menuItem) {
-
+                        foreach ($option as $sourcePosition => $menuControlItem) {
+                            $menuOperator[$menuControlItem['position']] = $menuControlItem;
+                            $menuOperator[$menuControlItem['position']]['source'] = $sourcePosition;
                         }
 
 
-                        echo '<pre>'; print_r($option); echo '</pre>';
+                        echo '<pre>'; print_r($menuOperator); echo '</pre>';
                         ?>
 
                         <div id="cinch-access-control">
