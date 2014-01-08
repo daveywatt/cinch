@@ -78,8 +78,9 @@ class Cinch {
 
             /* Add jQuery UI functions to admin head */
             \add_action('load-'.$optionsPage, function() {
-                    \wp_enqueue_script('jquery-ui-core');
-                    \wp_enqueue_script('jquery-ui-selectable');
+                \wp_enqueue_script('jquery-ui-core');
+                \wp_enqueue_script('jquery-ui-selectable');
+                \wp_enqueue_script('jquery-ui-sortable');
             });
         }
 
@@ -249,86 +250,153 @@ class Cinch {
 
                         $optionID = '__cinch_access_control';
                         $option = \get_option($optionID);
+
+                        /* Build sorted menu */
+                        $menuOperator = array();
+                        foreach ($menu as $menuPosition => $menuItem) {
+
+                        }
+
+
+                        echo '<pre>'; print_r($option); echo '</pre>';
                         ?>
 
                         <div id="cinch-access-control">
 
-                            <?php foreach ($menu as $menuItem) { if ($menuItem[0] == '' || $menuItem[0] === 'Cinch') continue; ?>
+                            <?php foreach ($menu as $menuPosition => $menuItem) { if ($menuItem[0] === 'Cinch') continue; ?>
 
-                                <ul class="cinch-access-control">
+                                <?php
+                                $topItemPointer = (strstr($menuItem[2], '.php') !== false ? $menuItem[2] : 'admin.php?page='.$menuItem[2]);
+                                $isRestricted = ($option[$menuPosition]['restricted'] == 'false' ? false : true);
+                                //TODO: Add renaming to menu elements
+                                $topLabel = trim(preg_replace('/[0-9]+/', '', strip_tags($menuItem[0])));
+                                ?>
 
-                                    <?php
-                                    $topItemPointer = (strstr($menuItem[2], '.php') !== false ? $menuItem[2] : 'admin.php?page='.$menuItem[2]);
-                                    $isActive = (Cinch::array_key_exists_r($topItemPointer, $option) ? true : false);
-                                    //TODO: Add renaming to menu elements
-                                    ?>
+                                <?php if ($menuItem[4] === 'wp-menu-separator') { ?>
 
-                                    <li class="ui-widget-content top-item<?=($isActive ? ' ui-selected' : '')?>" data-pointer="<?=$topItemPointer?>">
-                                        <span><?=trim(preg_replace('/[0-9]+/', '', strip_tags($menuItem[0])))?></span>
-                                        <?=($isActive ? '<input type="hidden" name="'.$optionID.'[]['.$topItemPointer.']" id="'.$optionID.'[]['.$topItemPointer.']" value="true" />' : '')?>
-                                    </li>
+                                    <ul class="cinch-access-control seperator">
+                                        <li class="ui-widget-content top-item top-handle" data-position="<?=$menuPosition?>" data-pointer="<?=$topItemPointer?>">&nbsp;</li>
+                                        <input type="hidden" name="<?=$optionID?>[<?=$menuPosition?>][pointer]" class="item-is-active" value="<?=$topItemPointer?>" />
+                                        <input type="hidden" name="<?=$optionID?>[<?=$menuPosition?>][label]" value="seperator" />
+                                        <input type="hidden" name="<?=$optionID?>[<?=$menuPosition?>][position]" class="item-position" value="<?=$menuPosition?>" />
+                                    </ul>
 
-                                    <?php if (isset($submenu[$menuItem[2]]) && array_shift($submenu[$menuItem[2]]))
-                                        foreach($submenu[$menuItem[2]] as $subMenuItem) { ?>
+                                <?php } else { ?>
 
-                                        <?php
-                                        $subItemPointer = (strstr($subMenuItem[2], '.php') !== false ? $subMenuItem[2] : 'admin.php?page='.$subMenuItem[2]);
-                                        $isActive = (Cinch::array_key_exists_r($subItemPointer, $option) ? true : false);
-                                        ?>
-
-                                        <li class="ui-widget-content sub-item<?=($isActive ? ' ui-selected' : '')?>" data-pointer="<?=$subItemPointer?>">
-                                            <span><?=trim(preg_replace('/[0-9]+/', '', strip_tags($subMenuItem[0])))?></span>
-                                            <?=($isActive ? '<input type="hidden" name="'.$optionID.'[]['.$subItemPointer.']" id="'.$optionID.'[]['.$subItemPointer.']" value="true" />' : '')?>
+                                    <ul class="cinch-access-control">
+                                        <div class="handle top-handle">&#8853;</div>
+                                        <li class="ui-widget-content top-item<?=($isRestricted ? ' ui-selected' : '')?>" data-position="<?=$menuPosition?>" data-pointer="<?=$topItemPointer?>" data-label="<?=$topLabel?>">
+                                            <span><?=$topLabel?></span>
+                                            <?php //($isActive ? '<input type="hidden" name="'.$optionID.'[]['.$topItemPointer.']" id="'.$optionID.'[]['.$topItemPointer.']" value="true" />' : '')?>
+                                            <input type="hidden" name="<?=$optionID?>[<?=$menuPosition?>][restricted]" class="item-is-restricted" value="<?=($isRestricted ? 'true' : 'false')?>" />
+                                            <input type="hidden" name="<?=$optionID?>[<?=$menuPosition?>][pointer]" value="<?=$topItemPointer?>" />
+                                            <input type="hidden" name="<?=$optionID?>[<?=$menuPosition?>][label]" value="<?=$topLabel?>" />
+                                            <input type="hidden" name="<?=$optionID?>[<?=$menuPosition?>][position]" class="item-position" value="<?=$menuPosition?>" />
                                         </li>
 
-                                    <?php } ?>
+                                        <?php if (isset($submenu[$menuItem[2]])) { ?>
 
-                                </ul>
+                                            <ul class="cinch-access-control-subs">
 
-                            <?php } ?>
+                                            <?php foreach($submenu[$menuItem[2]] as $subMenuPosition => $subMenuItem) { ?>
+
+                                                <?php
+                                                $subItemPointer = (strstr($subMenuItem[2], '.php') !== false ? $subMenuItem[2] : 'admin.php?page='.$subMenuItem[2]);
+                                                $isRestricted = ($option[$menuPosition]['submenu'][$subMenuPosition]['restricted'] == 'false' ? false : true);
+                                                $subLabel = trim(preg_replace('/[0-9]+/', '', strip_tags($subMenuItem[0])));
+                                                ?>
+
+                                                <li class="ui-widget-content sub-item<?=($isRestricted ? ' ui-selected' : '')?>" data-position="<?=$subMenuPosition?>" data-pointer="<?=$subItemPointer?>" data-label="<?=$subLabel?>">
+                                                    <div class="handle sub-handle">&#8853;</div>
+                                                    <span><?=$subLabel?></span>
+                                                    <?php //($isActive ? '<input type="hidden" name="'.$optionID.'[]['.$subItemPointer.']" id="'.$optionID.'[]['.$subItemPointer.']" value="true" />' : '')?>
+                                                    <input type="hidden" name="<?=$optionID?>[<?=$menuPosition?>][submenu][<?=$subMenuPosition?>][restricted]" class="item-is-restricted" value="<?=($isRestricted ? 'true' : 'false')?>" />
+                                                    <input type="hidden" name="<?=$optionID?>[<?=$menuPosition?>][submenu][<?=$subMenuPosition?>][pointer]" value="<?=$subItemPointer?>" />
+                                                    <input type="hidden" name="<?=$optionID?>[<?=$menuPosition?>][submenu][<?=$subMenuPosition?>][label]" value="<?=$subLabel?>" />
+                                                    <input type="hidden" name="<?=$optionID?>[<?=$menuPosition?>][submenu][<?=$subMenuPosition?>][position]" class="item-position" value="<?=$subMenuPosition?>" />
+                                                </li>
+
+                                            <?php } ?>
+
+                                            </ul>
+
+                                        <?php } ?>
+
+                                    </ul>
+
+                            <?php
+                                }
+                            }
+                            ?>
 
                         </div>
 
                         <script>
                             jQuery(function($) {
 
-                                $('.cinch-access-control').selectable({
-                                    selected: function(event, ui) {
-                                        var pointer = '__cinch_access_control[]['+$(ui.selected).attr('data-pointer')+']';
-                                        $(ui.selected).append('<input type="hidden" name="'+pointer+'" id="'+pointer+'" value="true" />');
-                                    },
-                                    unselected: function(event, ui) {
-                                        $(ui.unselected).find('input').remove();
-                                    }
-                                });
-
-                                var renameActive = false;
-                                $('.cinch-access-control li span').dblclick(function(e) {
-
-                                    e.preventDefault();
-                                    var currentName = $(this).html(),
-                                        contElem = $(this),
-                                        fillWidth = contElem.parent().width(),
-                                        padding = parseInt(contElem.css('padding-left'))+parseInt(contElem.css('padding-right'));
-
-                                    $('.cinch-access-control li span input').blur();
-
-                                    if (!renameActive) {
-
-                                        renameActive = true;
-                                        $(this).parent().removeClass('ui-selected');
-                                        $(this).addClass('renaming').html('').append('<input type="text" value="'+currentName+'" />');
-                                        $(this).find('input').css({width:fillWidth+'px'}).focus().select().bind('blur', function() {
-                                            var newVal = ($(this).val().length > 0 ? $(this).val() : currentName);
-                                            contElem.removeClass('renaming').html(newVal);
-                                            renameActive = false;
+                                $('#cinch-access-control').sortable({
+                                    handle: '.top-handle',
+                                    stop: function(event, ui) {
+                                        $.each($(this).find('.cinch-access-control'), function() {
+                                            $(this).find('li.top-item').attr('data-position', $(this).index());
+                                            $(this).find('input.item-position').val($(this).index());
                                         });
                                     }
-                                });
+                                }).disableSelection();
+
+                                $('.cinch-access-control-subs').sortable({
+                                    handle: '.sub-handle',
+                                    stop: function(event, ui) {
+                                        $.each($(this).find(''), function() {
+                                            $(this).find('li').attr('data-position', $(this).index());
+                                            $(this).find('input.item-position').val($(this).index());
+                                        });
+                                    }
+                                }).disableSelection();
+
+                                $('.cinch-access-control:not(.seperator)').selectable({
+                                        filter: 'li',
+                                        cancel: '.handle',
+                                        selected: function(event, ui) {
+                                            //var pointer = '__cinch_access_control[]['+$(ui.selected).attr('data-pointer')+']';
+                                            //$(ui.selected).append('<input type="hidden" name="'+pointer+'" id="'+pointer+'" value="true" />');
+                                            $(ui.selected).find('input.item-is-restricted').val('true');
+                                        },
+                                        unselected: function(event, ui) {
+                                            //$(ui.unselected).find('input').remove();
+                                            $(ui.unselected).find('input.item-is-restricted').val('false');
+                                        }
+                                    }
+                                );
+
+                                var rename = function() {
+
+                                    $('.cinch-access-control li span').dblclick(function(e) {
+
+                                        e.preventDefault();
+
+                                        var currentName = $(this).html(),
+                                            fillWidth = $(this).parent().width();
+
+                                        if (!$(this).hasClass('renaming')) {
+
+                                            $(this).unbind('dblclick');
+                                            $(this).parent().removeClass('ui-selected');
+                                            $(this).addClass('renaming').html('').append('<input type="text" value="'+currentName+'" />');
+                                            $(this).find('input').css({width:fillWidth+'px'}).focus().select().bind('blur', function() {
+                                                var newVal = (typeof $(this).val() !== 'undefined' && $(this).val().length > 0 ? $(this).val() : currentName);
+                                                $(this).parent('span').removeClass('renaming').html(newVal);
+                                                $(this).remove();
+                                                rename();
+                                            });
+                                        }
+                                    });
+                                };
+                                rename();
                             });
                         </script>
 
-                        <?php echo '<pre>'; print_r($option); echo '</pre>'; ?>
+                        <?php echo '<pre>'; print_r($menu); echo '</pre>'; ?>
 
                     <?php
                 },
