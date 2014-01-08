@@ -90,17 +90,32 @@ class Cinch {
             global $menu, $submenu;
             $accessControl = get_option('__cinch_access_control');
 
-            foreach ($menu as $menuKey => $menuItem) {
-                if (Cinch::array_key_exists_r($menuItem[2], $accessControl))
-                    unset($menu[$menuKey]);
+            /*foreach ($menu as $menuKey => $menuItem) {
+                echo $menuKey;
+                //if ($menuItem[2] === $accessControl['pointer'])
+                   // unset($menu[$menuKey]);
+            }*/
+
+            $menuOrder = array(); //new menu order array
+            foreach ($accessControl as $access) {
+                if ($access['restricted'] == 'true') \remove_menu_page($access['pointer']); //unset($menu[$access['position']]);
+                array_push($menuOrder, $access['pointer']);
             }
 
-            foreach ($submenu as $subMenuKey => $subMenuItem) {
+            print_r($menuOrder);
+
+            /* Reorder menu items */
+            \add_filter('custom_menu_order', '__return_true');
+            \add_filter('menu_order', function($menuOrder) {
+                return $menuOrder;
+            });
+
+            /*foreach ($submenu as $subMenuKey => $subMenuItem) {
                 foreach ($subMenuItem as $subMenuChild) {
                     if (Cinch::array_key_exists_r($subMenuChild[2], $accessControl))
                         unset($submenu[$subMenuKey]);
                 }
-            }
+            }*/
         }
     }
 
@@ -381,10 +396,10 @@ class Cinch {
 
                                         if (!$(this).hasClass('renaming')) {
 
-                                            $(this).unbind('dblclick');
                                             $(this).parent().removeClass('ui-selected');
-                                            $(this).addClass('renaming').html('').append('<input type="text" value="'+currentName+'" />');
-                                            $(this).find('input').css({width:fillWidth+'px'}).focus().select().bind('blur', function() {
+                                            $(this).unbind('dblclick').addClass('renaming').html('').append('<input type="text" value="'+currentName+'" />')
+                                                .find('input').css({width:fillWidth+'px'}).focus().select().bind('blur', function() {
+
                                                 var newVal = (typeof $(this).val() !== 'undefined' && $(this).val().length > 0 ? $(this).val() : currentName);
                                                 $(this).parent('span').removeClass('renaming').html(newVal);
                                                 $(this).remove();
@@ -464,7 +479,10 @@ class Cinch {
             /* Check for access control blocked pages */
             $accessControl = get_option('__cinch_access_control');
 
-            if (Cinch::array_key_exists_r($currentRequest, $accessControl)) return false;
+            //if (Cinch::array_key_exists_r($currentRequest, $accessControl)) return false;
+            foreach ($accessControl as $position => $access) {
+                if ($access['pointer'] === $currentRequest && $access['restricted'] === 'true') return false;
+            }
             return true;
         }
         return true;
