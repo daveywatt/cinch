@@ -26,7 +26,7 @@ class Cinch {
         Cinch::autoLoader($autoload);
 
         /* Create admin UI */
-        \add_action('admin_menu', array(CINCH_CLASS, 'menu'));
+        \add_action('admin_menu', array(CINCH_CLASS, 'menu'), 9999);
 
         /* Register admin CSS styles */
         \add_action('admin_enqueue_scripts', array(CINCH_CLASS, 'adminStyles'));
@@ -96,19 +96,23 @@ class Cinch {
                    // unset($menu[$menuKey]);
             }*/
 
-            $menuOrder = array(); //new menu order array
+            global $menuOrder;
             foreach ($accessControl as $access) {
-                if ($access['restricted'] == 'true') \remove_menu_page($access['pointer']); //unset($menu[$access['position']]);
-                array_push($menuOrder, $access['pointer']);
+                if ($access['restricted'] === 'true') \remove_menu_page($access['pointer']);
+                if (!empty($access['submenu'])) foreach($access['submenu'] as $sub) {
+                    if ($sub['restricted'] === 'true') {
+                        $formattedSubPointer = str_replace('&', '&amp;', str_replace('admin.php?page=', '', $sub['pointer']));
+                        var_dump(\remove_submenu_page($access['pointer'], $formattedSubPointer));
+                    }
+                }
+                $menuOrder[] = $access['pointer'];
             }
 
-            print_r($menuOrder);
+            //print_r($menuOrder);
 
             /* Reorder menu items */
             \add_filter('custom_menu_order', '__return_true');
-            \add_filter('menu_order', function($menuOrder) {
-                return $menuOrder;
-            });
+            \add_filter('menu_order', function() { global $menuOrder; return $menuOrder; });
 
             /*foreach ($submenu as $subMenuKey => $subMenuItem) {
                 foreach ($subMenuItem as $subMenuChild) {
@@ -274,7 +278,7 @@ class Cinch {
                         }
 
 
-                        echo '<pre>'; print_r($menuOperator); echo '</pre>';
+                        //echo '<pre>'; print_r($menuOperator); echo '</pre>';
                         ?>
 
                         <div id="cinch-access-control">
@@ -297,7 +301,11 @@ class Cinch {
                                         <input type="hidden" name="<?=$optionID?>[<?=$menuPosition?>][position]" class="item-position" value="<?=$menuPosition?>" />
                                     </ul>
 
-                                <?php } else { ?>
+                                <?php } else {
+
+                                //if ($menuItem[4] !== 'wp-menu-separator') {
+
+                                ?>
 
                                     <ul class="cinch-access-control">
                                         <div class="handle top-handle">&#8853;</div>
@@ -480,8 +488,11 @@ class Cinch {
             $accessControl = get_option('__cinch_access_control');
 
             //if (Cinch::array_key_exists_r($currentRequest, $accessControl)) return false;
-            foreach ($accessControl as $position => $access) {
+            foreach ($accessControl as $access) {
                 if ($access['pointer'] === $currentRequest && $access['restricted'] === 'true') return false;
+                if (!empty($access['submenu'])) foreach($access['submenu'] as $sub) {
+                    if (in_array($currentRequest, $sub) && $sub['restricted'] === 'true') return false;
+                }
             }
             return true;
         }
