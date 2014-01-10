@@ -108,7 +108,7 @@ class Cinch {
                 $menuOrder[] = $access['pointer'];
             }
 
-            //print_r($menuOrder);
+            print_r($menuOrder);
 
             /* Reorder menu items */
             \add_filter('custom_menu_order', '__return_true');
@@ -271,12 +271,11 @@ class Cinch {
                         $option = \get_option($optionID);
 
                         /* Build sorted menu */
-                        $menuOperator = array();
+                        /*$menuOperator = array();
                         foreach ($option as $sourcePosition => $menuControlItem) {
                             $menuOperator[$menuControlItem['position']] = $menuControlItem;
                             $menuOperator[$menuControlItem['position']]['source'] = $sourcePosition;
-                        }
-
+                        }*/
 
                         //echo '<pre>'; print_r($menuOperator); echo '</pre>';
                         ?>
@@ -295,17 +294,13 @@ class Cinch {
                                 <?php if ($menuItem[4] === 'wp-menu-separator') { ?>
 
                                     <ul class="cinch-access-control seperator">
-                                        <li class="ui-widget-content top-item top-handle" data-position="<?=$menuPosition?>" data-pointer="<?=$topItemPointer?>">&nbsp;</li>
-                                        <input type="hidden" name="<?=$optionID?>[<?=$menuPosition?>][pointer]" class="item-is-active" value="<?=$topItemPointer?>" />
+                                        <li class="ui-widget-content top-item top-handle" data-position="<?=$menuPosition?>" data-pointer="<?=$menuItem[2]?>">&nbsp;</li>
+                                        <input type="hidden" name="<?=$optionID?>[<?=$menuPosition?>][pointer]" class="item-is-active" value="<?=$menuItem[2]?>" />
                                         <input type="hidden" name="<?=$optionID?>[<?=$menuPosition?>][label]" value="seperator" />
                                         <input type="hidden" name="<?=$optionID?>[<?=$menuPosition?>][position]" class="item-position" value="<?=$menuPosition?>" />
                                     </ul>
 
-                                <?php } else {
-
-                                //if ($menuItem[4] !== 'wp-menu-separator') {
-
-                                ?>
+                                <?php } else { ?>
 
                                     <ul class="cinch-access-control">
                                         <div class="handle top-handle">&#8853;</div>
