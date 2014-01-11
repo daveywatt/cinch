@@ -50,7 +50,7 @@ class Cinch {
     }
 
     /* Check for developer administrator account */
-    public function isDeveloperAdmin() {
+    public static function isDeveloperAdmin() {
 
         $option = get_option('__cinch_options');
         $developer_account = (isset($option['developer_administrator_account']) ? $option['developer_administrator_account'] : '1');
@@ -67,9 +67,11 @@ class Cinch {
         //TODO: add font awesome? icon instead of image
 
         if ((Cinch::isDeveloperAdmin())
-            || ((!Cinch::isDeveloperAdmin() && $cinchOptions = get_option('__cinch_options')) && $cinchOptions['allow_client_cinch'] === '1')) {
+            || ((!Cinch::isDeveloperAdmin() && $cinchOptions = get_option('__cinch_options'))
+            && Cinch::checkValidOperator($cinchOptions)
+            && (isset($cinchOptions['allow_client_cinch']) && $cinchOptions['allow_client_cinch'] === '1'))) {
 
-            $optionsPage = \add_menu_page('Options', 'Cinch', ADMIN_CAPABILITY, 'cinch', array(CINCH_CLASS, 'adminOptionsPage'), CINCH_URL.'/resources/cpticons/drill.png', 3);
+            $optionsPage = \add_menu_page('Options', 'Cinch', ADMIN_CAPABILITY, 'cinch', array(CINCH_CLASS, 'adminOptionsPage'), null, 3);
             \add_submenu_page('cinch', 'Add-ons', 'Add-ons', ADMIN_CAPABILITY, 'cinch-addons', array(CINCH_CLASS, 'adminAddonsPage'));
 
             /* Rename top level sub menu */
@@ -97,29 +99,38 @@ class Cinch {
             }*/
 
             /* Remove menu pages if restricted, rename if label differs */
-            foreach ($accessControl as $position => $access) {
+            if (Cinch::checkValidOperator($accessControl)) {
+                foreach ($accessControl as $position => $access) {
 
-                if ($access['restricted'] === 'true') \remove_menu_page($access['pointer']);
-                if ($access['label'] !== $menu[$position][0]) $menu[$position][0] = $access['label'];
-
-                if (!empty($access['submenu'])) foreach($access['submenu'] as $subPosition => $sub) {
-
-                    if ($sub['label'] !== $submenu[$access['pointer']][$subPosition][0])
-                        $submenu[$access['pointer']][$subPosition][0] = $sub['label'];
-
-                    if ($sub['restricted'] === 'true') {
-                        $formattedSubPointer = str_replace('&', '&amp;', str_replace('admin.php?page=', '', $sub['pointer']));
-                        \remove_submenu_page($access['pointer'], $formattedSubPointer);
+                    if (isset($access['restricted']) && $access['restricted'] === 'true') {
+                        \remove_menu_page(str_replace('admin.php?page=', '', $access['pointer']));
                     }
+
+
+                    /* Rename menu item to option label */
+                    if (isset($access['label']) && isset($menu[$position][0])) $menu[$position][0] = $access['label'];
+
+                    if (!empty($access['submenu'])) foreach($access['submenu'] as $subPosition => $sub) {
+
+                        if (isset($sub['label']) && isset($submenu[$access['pointer']][$subPosition]) && $sub['label'] !== $submenu[$access['pointer']][$subPosition][0])
+                            $submenu[$access['pointer']][$subPosition][0] = $sub['label'];
+
+                        if ($sub['restricted'] === 'true') {
+                            $formattedSubPointer = str_replace('&', '&amp;', str_replace('admin.php?page=', '', $sub['pointer']));
+                            \remove_submenu_page($access['pointer'], $formattedSubPointer);
+                        }
+                    }
+                    $menuOrder[] = $access['pointer'];
                 }
-                $menuOrder[] = $access['pointer'];
             }
 
             //print_r($menuOrder);
 
             /* Reorder menu items */
-            \add_filter('custom_menu_order', '__return_true');
-            \add_filter('menu_order', function() { global $menuOrder; return $menuOrder; });
+            if (Cinch::checkValidOperator($menuOrder))  {
+                \add_filter('custom_menu_order', '__return_true');
+                \add_filter('menu_order', function() { global $menuOrder; return $menuOrder; });
+            }
 
             /*foreach ($submenu as $subMenuKey => $subMenuItem) {
                 foreach ($subMenuItem as $subMenuChild) {
@@ -152,10 +163,16 @@ class Cinch {
             '__cinch_access_control' => array(
                 'title' => 'Client Access Control',
                 'content' => function() {
-                        echo '<p>'.__('Select a menu page to disable client access to the relevant section.')."\n";
-                        echo '<br />Use the <strong>CTRL</strong> key (Windows) or <strong>CMD &#8984;</strong> key (Mac) to deselect or select multiple items.</p>';
+                ?>
 
-                    },
+                <div id="access-control-instructions">
+                    <p><?=__('Select a menu page to disable client access to the relevant section.')?>
+                    <br />Use the <strong>CTRL</strong> key (Windows) or <strong>CMD &#8984;</strong> key (Mac) to deselect or select multiple items.</p>
+                </div>
+
+                <?php
+
+                },
                 'page' => 'cinch-access-control'
             )
         );
@@ -277,31 +294,35 @@ class Cinch {
                         $optionID = '__cinch_access_control';
                         $option = \get_option($optionID);
 
-                        /* Build sorted menu */
-                        /*$menuOperator = array();
-                        foreach ($option as $sourcePosition => $menuControlItem) {
-                            $menuOperator[$menuControlItem['position']] = $menuControlItem;
-                            $menuOperator[$menuControlItem['position']]['source'] = $sourcePosition;
-                        }*/
+                        // echo '<pre>'; print_r($option); echo '</pre>';
 
-                       // echo '<pre>'; print_r($option); echo '</pre>';
-
-                        /* Sort menu array as per option order */
-                        $menuSorted = array();
-                        foreach($option as $position => $menuItem) {
-                            $menuSorted[$position] = $menu[$position];
+                        /* Sort menu array as per option order, but only if menu is not set */
+                        $menuOperator = $menu;
+                        if (Cinch::checkValidOperator($option)) {
+                            $menuOperator = array();
+                            foreach($option as $position => $menuItem) {
+                                /* Check for removed menu items */
+                                if (!isset($menu[$position]) || ($menu[$position][2] !== $menuItem['pointer']
+                                        && 'admin.php?page='.$menu[$position][2] !== $menuItem['pointer'])) continue;
+                                $menuOperator[$position] = $menu[$position];
+                            }
                         }
 
+                        $menuCounter = 0;
                         ?>
+
+                        <p>
+                            <button id="access-control-clear" class="button button-secondary">Re-enable all</button>
+                        </p>
 
                         <div id="cinch-access-control">
 
-                            <?php foreach ($menuSorted as $menuPosition => $menuItem) { if ($menuItem[0] === 'Cinch') continue; ?>
+                            <?php foreach ($menuOperator as $menuPosition => $menuItem) { if ($menuItem[0] === 'Cinch') continue; ?>
 
                                 <?php
+                                $menuCounter++;
                                 $topItemPointer = (strstr($menuItem[2], '.php') !== false ? $menuItem[2] : 'admin.php?page='.$menuItem[2]);
-                                $isRestricted = ($option[$menuPosition]['restricted'] == 'false' ? false : true);
-                                //TODO: Add renaming to menu elements
+                                $isRestricted = ($option[$menuPosition]['restricted'] == 'true' ? true : false);
                                 $topLabel = ($option[$menuPosition]['label'] != null ?
                                     $option[$menuPosition]['label'] : trim(preg_replace('/[0-9]+/', '', strip_tags($menuItem[0]))));
                                 ?>
@@ -309,18 +330,25 @@ class Cinch {
                                 <?php if ($menuItem[4] === 'wp-menu-separator') { ?>
 
                                     <ul class="cinch-access-control seperator">
-                                        <li class="ui-widget-content top-item top-handle" data-position="<?=$menuPosition?>" data-pointer="<?=$menuItem[2]?>">&nbsp;</li>
+                                        <span class="item-position-badge">
+                                            <span><?=$menuCounter?></span>
+                                        </span>
+                                        <li class="ui-widget-content top-item" data-position="<?=$menuPosition?>" data-pointer="<?=$menuItem[2]?>">&nbsp;</li>
                                         <input type="hidden" name="<?=$optionID?>[<?=$menuPosition?>][pointer]" class="item-is-active" value="<?=$menuItem[2]?>" />
                                         <!-- <input type="hidden" name="<?=$optionID?>[<?=$menuPosition?>][label]" value="seperator" /> -->
                                         <!-- <input type="hidden" name="<?=$optionID?>[<?=$menuPosition?>][position]" class="item-position" value="<?=$menuPosition?>" /> -->
                                     </ul>
 
-                                <?php } else { ?>
+                                <?php } else {  ?>
 
                                     <ul class="cinch-access-control">
-                                        <div class="handle top-handle">&#8853;</div>
                                         <li class="ui-widget-content item top-item<?=($isRestricted ? ' ui-selected' : '')?>" data-position="<?=$menuPosition?>" data-pointer="<?=$topItemPointer?>" data-label="<?=$topLabel?>">
-                                            <span><?=$topLabel?></span>
+                                            <span class="item-label-rename">
+                                                <?=$topLabel?>
+                                            </span>
+                                            <span class="item-position-badge">
+                                                <span><?=$menuCounter?></span>
+                                            </span>
                                             <?php //($isActive ? '<input type="hidden" name="'.$optionID.'[]['.$topItemPointer.']" id="'.$optionID.'[]['.$topItemPointer.']" value="true" />' : '')?>
                                             <input type="hidden" name="<?=$optionID?>[<?=$menuPosition?>][restricted]" class="item-is-restricted" value="<?=($isRestricted ? 'true' : 'false')?>" />
                                             <input type="hidden" name="<?=$optionID?>[<?=$menuPosition?>][pointer]" value="<?=$topItemPointer?>" />
@@ -336,13 +364,15 @@ class Cinch {
 
                                                 <?php
                                                 $subItemPointer = (strstr($subMenuItem[2], '.php') !== false ? $subMenuItem[2] : 'admin.php?page='.$subMenuItem[2]);
-                                                $isRestricted = ($option[$menuPosition]['submenu'][$subMenuPosition]['restricted'] == 'false' ? false : true);
+                                                $isRestricted = ($option[$menuPosition]['submenu'][$subMenuPosition]['restricted'] == 'true' ? true : false);
                                                 $subLabel = ($option[$menuPosition]['submenu'][$subMenuPosition]['label'] != null ?
                                                     $option[$menuPosition]['submenu'][$subMenuPosition]['label'] : trim(preg_replace('/[0-9]+/', '', strip_tags($subMenuItem[0]))));
                                                 ?>
 
                                                 <li class="ui-widget-content item sub-item<?=($isRestricted ? ' ui-selected' : '')?>" data-position="<?=$subMenuPosition?>" data-pointer="<?=$subItemPointer?>" data-label="<?=$subLabel?>">
-                                                    <span><?=$subLabel?></span>
+                                                    <span class="item-label-rename">
+                                                        <?=$subLabel?>
+                                                    </span>
                                                     <?php //($isActive ? '<input type="hidden" name="'.$optionID.'[]['.$subItemPointer.']" id="'.$optionID.'[]['.$subItemPointer.']" value="true" />' : '')?>
                                                     <input type="hidden" name="<?=$optionID?>[<?=$menuPosition?>][submenu][<?=$subMenuPosition?>][restricted]" class="item-is-restricted" value="<?=($isRestricted ? 'true' : 'false')?>" />
                                                     <input type="hidden" name="<?=$optionID?>[<?=$menuPosition?>][submenu][<?=$subMenuPosition?>][pointer]" value="<?=$subItemPointer?>" />
@@ -369,11 +399,13 @@ class Cinch {
                             jQuery(function($) {
 
                                 $('#cinch-access-control').sortable({
-                                    handle: '.top-handle',
+                                    handle: '.item-position-badge',
+                                    connectWith: '.cinch-column',
                                     stop: function(event, ui) {
                                         $.each($(this).find('.cinch-access-control'), function() {
                                             $(this).find('li.top-item').attr('data-position', $(this).index());
                                             $(this).find('input.item-position').val($(this).index());
+                                            $(this).find('.item-position-badge span').html(($(this).index()+1));
                                         });
                                     }
                                 }).disableSelection();
@@ -388,12 +420,10 @@ class Cinch {
                                     }
                                 }).disableSelection();*/
 
-                                $('.cinch-access-control:not(.seperator)').selectable({
+                                $('.cinch-access-control:not(.seperator)').mousedown(function(e){e.metaKey = true}).selectable({
                                         filter: 'li',
-                                        cancel: '.handle',
+                                        cancel: '.item-position-badge',
                                         selected: function(event, ui) {
-                                            //var pointer = '__cinch_access_control[]['+$(ui.selected).attr('data-pointer')+']';
-                                            //$(ui.selected).append('<input type="hidden" name="'+pointer+'" id="'+pointer+'" value="true" />');
                                             $(ui.selected).find('input.item-is-restricted').val('true');
                                             $('.cinch-access-control li').find('input').blur();
                                         },
@@ -423,7 +453,7 @@ class Cinch {
                                                 .find('input').css({width:fillWidth+'px'}).focus().select().bind('blur', function() {
 
                                                 var newVal = (typeof $(this).val() !== 'undefined' && $(this).val().length > 0 ? $(this).val() : currentName);
-                                                $(this).parent('span').removeClass('renaming').html(newVal);
+                                                $(this).parent('span.item-label-rename').removeClass('renaming').html(newVal);
                                                 parentItem.find('input.item-label').val(newVal);
                                                 $(this).remove();
                                                 rename();
@@ -432,6 +462,13 @@ class Cinch {
                                     });
                                 };
                                 rename();
+
+                                $('#access-control-clear').click(function(e) {
+                                    e.preventDefault();
+                                    $('.item-is-restricted').val('false');
+                                    $('.ui-widget-content').removeClass('ui-selected');
+
+                                })
                             });
                         </script>
 
@@ -490,23 +527,27 @@ class Cinch {
         return false;
     }
 
-    public function accessControlCheck() {
-        $currentRequest = end(explode('/', add_query_arg(null, null)));
+    public static function accessControlCheck() {
+        $currentRequest = explode('/', \add_query_arg(null, null));
+        $currentRequest = end($currentRequest);
 
         if (!Cinch::isDeveloperAdmin()) {
 
-            /* Check for Cinch request */
+            /* Get required options */
             $cinchOptions = get_option('__cinch_options');
-            if (strstr($currentRequest, 'admin.php?page=cinch') && $cinchOptions['allow_client_cinch'] !== '1') return false;
-
-            /* Check for access control blocked pages */
             $accessControl = get_option('__cinch_access_control');
 
-            //if (Cinch::array_key_exists_r($currentRequest, $accessControl)) return false;
-            foreach ($accessControl as $access) {
-                if ($access['pointer'] === $currentRequest && $access['restricted'] === 'true') return false;
-                if (!empty($access['submenu'])) foreach($access['submenu'] as $sub) {
-                    if (in_array($currentRequest, $sub) && $sub['restricted'] === 'true') return false;
+            /* Check for Cinch request */
+            if (Cinch::checkValidOperator($cinchOptions)
+                && strstr($currentRequest, 'admin.php?page=cinch') && $cinchOptions['allow_client_cinch'] !== '1') return false;
+
+            /* Check for access control blocked pages */
+            if (Cinch::checkValidOperator($accessControl)) {
+                foreach ($accessControl as $access) {
+                    if ($access['pointer'] === $currentRequest && $access['restricted'] === 'true') return false;
+                    if (!empty($access['submenu'])) foreach($access['submenu'] as $sub) {
+                        if (in_array($currentRequest, $sub) && $sub['restricted'] === 'true') return false;
+                    }
                 }
             }
             return true;
@@ -523,6 +564,10 @@ class Cinch {
     public static function in_array_r($needle, $haystack) {
         foreach ($haystack as $item) if (in_array($needle, $item)) return true;
         return false;
+    }
+
+    public static function checkValidOperator($option) {
+        return ((isset($option) && $option != null && !empty($option)) ? true : false);
     }
 }
 

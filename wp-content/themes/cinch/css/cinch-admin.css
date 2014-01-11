@@ -2,13 +2,16 @@ body {
     /*overflow: hidden;*/
 }
 
+#toplevel_page_cinch div.wp-menu-image:before {
+    content: "\f240" !important;
+}
+
 #cinch-access-control {
     width: 100%;
     overflow: hidden;
 }
 
 .cinch-access-control {
-    /*float: left;*/
     position: relative;
     width: 160px;
     margin: 8px 0;
@@ -18,30 +21,8 @@ body {
     border-radius: 3px;
 }
 
-.cinch-access-control .handle {
-    display: none;
-    position: absolute;
-    text-align: right;
-    top: 15px;
-    right: 13px;
-    color: #fff;
-    font-weight: bold;
-    cursor: pointer;
-    z-index: 9;
-}
-
-.cinch-access-control li .handle {
-    top: 8px;
-    right: 5px;
-}
-
-.cinch-access-control:hover > .handle,
-.cinch-access-control li:hover > .handle {
-    display: block;
-}
-
 .cinch-access-control.seperator li {
-    height: 10px;
+    height: 25px;
     background: #333;
 }
 
@@ -51,7 +32,7 @@ body {
     cursor: pointer;
 }
 
-.cinch-access-control li span {
+.cinch-access-control li span.item-label-rename {
     display: block;
     padding: 8px 76px 8px 10px;
 }
@@ -99,11 +80,63 @@ body {
 }
 
 .cinch-access-control li.ui-selected,
-.cinch-access-control li.top-item.ui-selected ~ li.sub-item {
+.cinch-access-control li.top-item.ui-selected ~ .cinch-access-control-subs > li.sub-item {
     background: #FF0000;
     color: #fff;
 }
 
-.cinch-access-control li.top-item.ui-selected ~ li.sub-item {
+.cinch-access-control li.top-item.ui-selected ~ .cinch-access-control-subs > li.sub-item {
     opacity: 0.75;
+}
+
+#cinch-access-control .item-label-rename {
+}
+
+#cinch-access-control .item-position-badge {
+    position: absolute;
+    right: 8px;
+    top: 7px;
+    background-color: #005684;
+    color: #fff;
+    display: block;
+    font-size: 9px;
+    line-height: 17px;
+    font-weight: 600;
+    margin: 1px 0 0 2px;
+    vertical-align: top;
+    -webkit-border-radius: 10px;
+    border-radius: 10px;
+    z-index: 26;
+}
+
+#cinch-access-control .cinch-access-control.seperator .item-position-badge {
+    cursor: pointer;
+    right: 11px;
+}
+
+#cinch-access-control .item-position-badge span {
+    display: block;
+    padding: 0 6px;
+}
+
+#cinch-admin-access-control .form-table th[scope="row"] {
+    display: none;
+}
+
+#cinch-admin-access-control .form-table td {
+    padding: 0;
+}
+
+#cinch-access-control .cinch-column {
+    width: 170px;
+    float: left;
+    margin-right: 10px;
+}
+
+#access-control-instructions p {
+    margin-bottom: 0;
+}
+
+#access-control-clear {
+    margin-bottom: 20px;
 }
