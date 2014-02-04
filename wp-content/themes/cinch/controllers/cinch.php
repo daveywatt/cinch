@@ -23,7 +23,13 @@ class Cinch {
         @require_once(CINCH_DIR.'/config.php');
 
         /* Autoload classes */
-        Cinch::autoLoader($autoload);
+        $autoload = array_merge(array(
+            'controllers/AdminControls'
+        ), $autoload);
+
+        foreach($autoload as $class) {
+            if (!class_exists($class)) include_once(CINCH_DIR.'/'.$class.'.php');
+        }
 
         /* Create admin UI */
         \add_action('admin_menu', array(CINCH_CLASS, 'menu'), 9999);
@@ -36,17 +42,6 @@ class Cinch {
 
         /* Access control over-rides */
         \add_action('admin_init', array(CINCH_CLASS, 'accessControl'));
-    }
-
-    /* Autoloader */
-    static public function autoLoader($classes) {
-
-        foreach($classes as $className => $classPath) {
-            if (!class_exists($className) && @include_once(CINCH_DIR.'/'.$classPath.'.php')) {
-                global $cinch;
-                @$cinch->$className = new $className;
-            }
-        }
     }
 
     /* Check for developer administrator account */
@@ -64,26 +59,38 @@ class Cinch {
     /* Cinch admin UI functions */
     public static function menu() {
 
-        //TODO: add font awesome? icon instead of image
-
         if ((Cinch::isDeveloperAdmin())
             || ((!Cinch::isDeveloperAdmin() && $cinchOptions = get_option('__cinch_options'))
             && Cinch::checkValidOperator($cinchOptions)
             && (isset($cinchOptions['allow_client_cinch']) && $cinchOptions['allow_client_cinch'] === '1'))) {
 
-            $optionsPage = \add_menu_page('Options', 'Cinch', ADMIN_CAPABILITY, 'cinch', array(CINCH_CLASS, 'adminOptionsPage'), null, 3);
-            \add_submenu_page('cinch', 'Add-ons', 'Add-ons', ADMIN_CAPABILITY, 'cinch-addons', array(CINCH_CLASS, 'adminAddonsPage'));
+            /*$optionsPage = \add_menu_page('Options', 'Cinch', ADMIN_CAPABILITY, 'cinch', array(CINCH_CLASS, 'adminOptionsPage'), null, 3);
+            \add_submenu_page('cinch', 'Add-ons', 'Add-ons', ADMIN_CAPABILITY, 'cinch-addons', array(CINCH_CLASS, 'adminAddonsPage'));*/
 
-            /* Rename top level sub menu */
-            global $submenu;
-            $submenu['cinch'][0][0] = 'Options';
+            $adminPages = array(
 
-            /* Add jQuery UI functions to admin head */
-            \add_action('load-'.$optionsPage, function() {
-                \wp_enqueue_script('jquery-ui-core');
-                \wp_enqueue_script('jquery-ui-selectable');
-                \wp_enqueue_script('jquery-ui-sortable');
-            });
+                'Cinch' => array(
+                    'title' => 'Options',
+                    'top_title' => 'Options',
+                    'capability' => ADMIN_CAPABILITY,
+                    'slug' => 'cinch',
+                    'function' => array(CINCH_CLASS, 'adminOptionsPage'),
+                    'icon' => array('css3', 'core'),
+                    'position' => 3,
+                    'scripts' => array('jquery-ui-core', 'jquery-ui-selectable', 'jquery-ui-sortable'),
+                    'submenus' => array(
+                        'cinch' => array(
+                            'page_title' => 'Add-ons',
+                            'menu_title' => 'Add-ons',
+                            'capability' => ADMIN_CAPABILITY,
+                            'slug' => 'cinch-addons',
+                            'function' => array(CINCH_CLASS, 'adminAddonsPage')
+                        )
+                    )
+                )
+            );
+
+            \AdminControls::menuPages($adminPages);
         }
 
         if (!Cinch::isDeveloperAdmin()) {
@@ -123,8 +130,6 @@ class Cinch {
                     $menuOrder[] = $access['pointer'];
                 }
             }
-
-            //print_r($menuOrder);
 
             /* Reorder menu items */
             if (Cinch::checkValidOperator($menuOrder))  {
@@ -569,6 +574,16 @@ class Cinch {
     public static function checkValidOperator($option) {
         return ((isset($option) && $option != null && !empty($option)) ? true : false);
     }
+
+    public static function checkValidString($string) {
+        return ((isset($string) && $string != null) ? true : false);
+    }
+
+    public static function checkValidArray($array) {
+        return ((isset($array) && $array != null && !empty($array) && count($array) > 0) ? true : false);
+    }
+
+
 }
 
 global $cinch;
