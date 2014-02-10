@@ -9,13 +9,14 @@ class AdminControls extends cinch\Cinch {
 
     private static $scripts;
     private static $styles;
+    private static $sections;
 
     public function __construct() {
     }
 
     public static function pages($menus) {
 
-        if (!parent::checkValidArray($menus)) return new WP_Error('empty_or_incorrect_datatype', __('Incorrect arguments for admin menu page.'));
+        if (!parent::checkValidArray($menus)) return new WP_Error('cinch_empty_or_incorrect_datatype', __('Cinch error: incorrect arguments for admin menu page.')); //TODO: own error handler
 
         foreach ($menus as $label => $menu) {
 
@@ -37,7 +38,7 @@ class AdminControls extends cinch\Cinch {
             if (parent::checkValidArray($menu['submenus'])) {
                 foreach($menu['submenus'] as $parentSlug => $submenu) {
                     //TODO: attach script/styles enqueuing to submenus
-                    add_submenu_page($parentSlug, $submenu['page_title'], $submenu['menu_title'], $submenu['capability'], $submenu['slug'], $submenu['function']);
+                    add_submenu_page($parentSlug, $submenu['page_title'], $submenu['menu_title'], $submenu['capability'], $submenu['slug'], $submenu['callback']);
                 }
             }
 
@@ -50,10 +51,45 @@ class AdminControls extends cinch\Cinch {
     }
 
     public static function sections($sections) {
-        foreach($sections as $section) {
-            add_settings_section($section['group'], (parent::checkValidString($section['title']) ? $section['title'] : null), $section['view'], $section['page']);
+        self::$sections = $sections;
+        add_action('admin_init', array('AdminControls', 'adminSectionsCallback'));
+    }
+
+    public static function adminSectionsCallback() {
+
+        foreach(self::$sections as $section) {
+
+            add_settings_section($section['group'], (parent::checkValidString($section['title']) ? $section['title'] : null), $section['callback'], $section['page']);
+
+            if ((isset($section['fields']) && parent::checkValidArray($section['fields']))) {
+
+                foreach($section['fields'] as $field) {
+
+                    //TODO: add options with defaults on theme activate?
+                    if (get_option($section['group']) == false) {
+                        $default = (is_array($field['default']) ? serialize($field['default']) : $field['default']);
+                        add_option($section['group'], $default);
+                    }
+
+                    add_settings_field($field['id'], __($field['title']), $field['callback'], $section['page'], $section['group'], array('label_for' => $section['group']));
+                    register_setting($section['group'], $section['group'], $field['sanitize']);
+                }
+            }
         }
     }
+
+    /*public static function fields($fields) {
+
+        foreach($fields as $field) {
+            //TODO: add options with defaults on theme activate?
+            if (get_option($field['id']) == false) {
+                $default = (is_array($field['default']) ? serialize($field['default']) : $field['default']);
+                add_option($field['id'], $default);
+            }
+            \add_settings_field($field['id'], __($field['title']), $field['html'], $field['page'], $field['group'], array('label_for' => $field['id']));
+            \register_setting($field['group'], $field['id'], $field['sanitize']);
+        }
+    }*/
 
     public static function enqueueScripts() {
 
