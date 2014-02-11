@@ -12,6 +12,8 @@ class AdminControls extends cinch\Cinch {
     private static $sections;
 
     public function __construct() {
+
+        add_action('admin_notices', array(&$this, 'settingsNotices'));
     }
 
     public static function pages($menus) {
