@@ -145,13 +145,6 @@ class AdminOptions extends cinch\Cinch {
                 do_settings_sections($this->tabs[$this->activeTab]['slug']);
             }
 
-            /*foreach($this->tabs as $tab) {
-
-                if (isset($this->activeTab) && );
-                settings_fields($section['group']);
-                do_settings_sections($section['section']);
-            }*/
-
             ?>
 
             <?php submit_button('Save Options'); ?>
@@ -176,21 +169,37 @@ class AdminOptions extends cinch\Cinch {
 
         //TODO: check for option validity to capture PHP errors
 
-        /* Get current option data, merge into in existing option array */
+        /* Get current option data, merge into in existing option array - will also check if sub option exists */
         $option['current'] = get_option($option['id']);
+
+        if (isset($option['current']) && (isset($option['serialized']) && $option['serialized'])) {
+            $option['current'] = (isset($option['current'][$option['sub_id']]) ? $option['current'][$option['sub_id']] : '');
+        }
 
         /* Field callbacks can be over-ridden by defining a function using the cinch_adminOptions_field_[TYPE] prefix */
         if (function_exists('cinch_adminOptions_field_'.$option['type'])) return call_user_func_array('cinch_adminOptions_field_'.$option['type'], $option);
 
-        /*switch($option['type']) {
-            case 'select':
-                $options = $option['options'];
-            break;
-        }*/
+        /* Custom view requested? If so, we will call the view else use a field type */
+        if ($option['type'] == 'custom' && isset($option['view'])) {
 
-        $childViewPath = '/cinch/fields/'.$option['type'].'.php';
-        $cinchViewPath = '/views/fields/'.$option['type'].'.php';
+            /* Check for child template file and over-ride if exists */ //TODO: should we use locate_template here?
+            $childViewPath = '/cinch/'.$option['view'].'.php';
+            $cinchViewPath = '/views/'.$option['view'].'.php';
+
+        } else {
+
+            /* Check for child template file and over-ride if exists */ //TODO: should we use locate_template here?
+            $childViewPath = '/cinch/fields/'.$option['type'].'.php';
+            $cinchViewPath = '/views/fields/'.$option['type'].'.php';
+        }
+
+        //TODO: capture view error here if it does not exist etc.
+
         $viewSource = ((CHILD_DIR && is_file(CHILD_DIR.$childViewPath)) ? CHILD_DIR.$childViewPath : CINCH_DIR.$cinchViewPath);
+
+        /* Format option id for view */
+        if (isset($option['sub_id']) && $option['sub_id'] != null)
+            $option['id'] = ((isset($option['multiple']) && $option['multiple']) ? $option['id'].'['.$option['sub_id'].'][]' : $option['id'].'['.$option['sub_id'].']');
 
         /* Format attributes */
         if (isset($option['attributes']) && parent::checkValidArray($option['attributes'])) {
@@ -208,14 +217,17 @@ class AdminOptions extends cinch\Cinch {
         $option['attributes'] = (isset($attributes) ? $attributes : null);
 
         /* Add enhanced data attribute for select2 elements */
-        if ($option['type'] == 'select' && isset($option['enhanced']) && $option['enhanced'] === true) $option['attributes'] .= ' data-enhanced="true"';
+        if ($option['type'] == 'select' && isset($option['enhanced']) && $option['enhanced'] == true) $option['attributes'] .= ' data-enhanced="true"';
 
-        /* Check for default */
-        if (!isset($option['default'])) $option['default'] = (($option['type'] == 'select' || $option['type'] == 'checkbox') ? '0' : '');
+        /* Check for defaults */
+        //if (!isset($option['current']) || $option['current'] == null)
+            //$option['current'] = (isset($option['default']) ? $option['default'] : (($option['type'] == 'select' || $option['type'] == 'checkbox') ? false : ''));
 
         //TODO: tooltips on [help]
         //TODO: descriptions on fields
         //TODO: custom validation on inputs
+
+        //TODO: reduce amount of logic in views?
 
         if (isset($viewSource) && is_file($viewSource))
             return require($viewSource);
@@ -232,13 +244,34 @@ class AdminOptions extends cinch\Cinch {
             $customCallback = (($option['type'] == 'custom' && isset($option['callback']) && function_exists($option['callback'])) ? true : false);
             $callback = ($customCallback ? $option['callback'] : array(&$this, 'field'));
 
+            /* Format option slug based on id */
+            if (is_array($option['id']) && count($option['id']) == 2) {
+                $option['sub_id'] = $option['id'][1];
+                $option['id'] = $option['id'][0];
+                $option['serialized'] = true;
+            } else {
+                $option['sub_id'] = $option['id'];
+            }
+
+            /*$option['sub_id'] = (isset($option['id'][1]) ? $option['id'][1] : $option['id']);
+            $option['id'] = (isset($option['id'][0]) ? $option['id'][0] : $option['id']);*/
+
+            //$option['slug'] = (isset($option['id'][1]) ? $option['id'][1] : $option['id']);
+
+            /* Validate sanitation */
+            //$option['sanitize'] = ((isset($option['sanitize']) && function_exists($option['sanitize'])) ? $option['sanitize'] : '');
+
+            //TODO: work out how to handle sanitize here, we cant use on register_setting as it could be a serialized array
+
             /* Register field and parse option array data to the field() function */
-            add_settings_field($option['id'].sanitize_title($option['label']), $option['label'], $callback, $option['page'], $option['id'], $option);
-            register_setting($option['id'], $option['id'], ''); //TODO: add sanitize on callback
+            add_settings_field($option['sub_id'], $option['label'], $callback, $option['page'], $option['group'], $option);
+            register_setting($option['group'], $option['id'], null);
 
             /* Check for enhanced field option(s), include and configure as required */
-            if (!wp_script_is('select2')) wp_enqueue_script('select2', CINCH_URL.'/vendor/select2/select2.min.js', array('jquery'));
-            if (!wp_style_is('select2')) wp_enqueue_style('select2', CINCH_URL.'/vendor/select2/select2.css');
+            if (isset($option['enhanced']) && $option['enhanced']) {
+                if (!wp_script_is('select2')) wp_enqueue_script('select2', CINCH_URL.'/vendor/select2/select2.min.js', array('jquery'));
+                if (!wp_style_is('select2')) wp_enqueue_style('select2', CINCH_URL.'/vendor/select2/select2.css');
+            }
 
         }
 
@@ -246,7 +279,7 @@ class AdminOptions extends cinch\Cinch {
 
     public function registerSection($group, $title, $page)
     {
-        add_settings_section($group, $title, null, $page); //TODO: possibly add content output for callback?
+        add_settings_section($group, $title, null, $page); //TODO: possibly add content description output for callback?
     }
 
     public static function validateArguments($arguments)

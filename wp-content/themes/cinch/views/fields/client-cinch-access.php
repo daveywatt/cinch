@@ -1,1 +1,0 @@
-<input type="checkbox" name="<?=$group?>[<?=$option?>]" id="<?=$group?>[<?=$option?>]" value="1"<?=($optionObject[$option] == '1' ? ' checked="checked"' : '')?>>
