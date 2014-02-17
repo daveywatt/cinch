@@ -140,3 +140,8 @@ body {
 #access-control-clear {
     margin-bottom: 20px;
 }
+
+/* AdminOptions input fields */
+.select2-container {
+    min-width: 280px;
+}

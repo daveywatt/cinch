@@ -2,7 +2,7 @@
 /**
  * @name AdminOptions
  *
- * Streamlines the process of adding admin panel options to WordPress
+ * Streamlines the process of adding admin options to WordPress
  *
  * @package Cinch
  *
@@ -106,6 +106,8 @@ class AdminOptions extends cinch\Cinch {
 
         /**
          * @function tabs
+         * @params none
+         * @echoes tabs HTML
          *
          * This function MUST be called in a options view or callback before the options() output if any sub pages have been defined as tabs
          * All tabs will be constructed into sections for use in the options() output before outputting the tab structure
@@ -113,16 +115,14 @@ class AdminOptions extends cinch\Cinch {
 
         if (!empty($this->tabs))
         {
-            $this->activeTab = (isset($_GET['tab']) ? $_GET['tab'] : $this->tabs[0]['slug']);
+            $this->activeTab = (isset($_GET['tab']) ? $_GET['tab'] : $this->tabs[key($this->tabs)]['slug']);
             ?>
 
             <h2 class="nav-tab-wrapper">
 
                 <?php
                 foreach($this->tabs as $tab)
-                {
                     echo '<a href="?page='.$tab['page'].'&tab='.$tab['slug'].'" class="nav-tab'.($this->activeTab == $tab['slug'] ? ' nav-tab-active' : '').'">'.$tab['label'].'</a>'."\n";
-                }
                 ?>
 
             </h2>
@@ -171,20 +171,81 @@ class AdminOptions extends cinch\Cinch {
         settings_errors();
     }
 
-    public function field($type) {
-        echo '[field]';
+    public function field($option)
+    {
+
+        //TODO: check for option validity to capture PHP errors
+
+        /* Get current option data, merge into in existing option array */
+        $option['current'] = get_option($option['id']);
+
+        /* Field callbacks can be over-ridden by defining a function using the cinch_adminOptions_field_[TYPE] prefix */
+        if (function_exists('cinch_adminOptions_field_'.$option['type'])) return call_user_func_array('cinch_adminOptions_field_'.$option['type'], $option);
+
+        /*switch($option['type']) {
+            case 'select':
+                $options = $option['options'];
+            break;
+        }*/
+
+        $childViewPath = '/cinch/fields/'.$option['type'].'.php';
+        $cinchViewPath = '/views/fields/'.$option['type'].'.php';
+        $viewSource = ((CHILD_DIR && is_file(CHILD_DIR.$childViewPath)) ? CHILD_DIR.$childViewPath : CINCH_DIR.$cinchViewPath);
+
+        /* Format attributes */
+        if (isset($option['attributes']) && parent::checkValidArray($option['attributes'])) {
+
+            $attributes = '';
+            foreach ($option['attributes'] as $index => $value) {
+                if (!is_numeric($index)) {
+                    $attributes .= ' '.$index.'="'.$value.'"';
+                } else {
+                    $attributes .= ' '.$value;
+                }
+            }
+        }
+
+        $option['attributes'] = (isset($attributes) ? $attributes : null);
+
+        /* Add enhanced data attribute for select2 elements */
+        if ($option['type'] == 'select' && isset($option['enhanced']) && $option['enhanced'] === true) $option['attributes'] .= ' data-enhanced="true"';
+
+        /* Check for default */
+        if (!isset($option['default'])) $option['default'] = (($option['type'] == 'select' || $option['type'] == 'checkbox') ? '0' : '');
+
+        //TODO: tooltips on [help]
+        //TODO: descriptions on fields
+        //TODO: custom validation on inputs
+
+        if (isset($viewSource) && is_file($viewSource))
+            return require($viewSource);
+
+        return false;
     }
 
-    public function loadOptions() {
+    public function loadOptions()
+    {
 
         foreach($this->options as $option) {
 
-            add_settings_field($option['id'].sanitize_title($option['label']), $option['label'], array(&$this, 'field'), $option['page'], $option['id'], array('type' => 'test')); //TODO: use callback functions on master option generator function!
-            register_setting($option['id'], $option['label'], ''); //TODO: add sanitize on callback
+            /* Determine callback, user defined or default */
+            $customCallback = (($option['type'] == 'custom' && isset($option['callback']) && function_exists($option['callback'])) ? true : false);
+            $callback = ($customCallback ? $option['callback'] : array(&$this, 'field'));
+
+            /* Register field and parse option array data to the field() function */
+            add_settings_field($option['id'].sanitize_title($option['label']), $option['label'], $callback, $option['page'], $option['id'], $option);
+            register_setting($option['id'], $option['id'], ''); //TODO: add sanitize on callback
+
+            /* Check for enhanced field option(s), include and configure as required */
+            if (!wp_script_is('select2')) wp_enqueue_script('select2', CINCH_URL.'/vendor/select2/select2.min.js', array('jquery'));
+            if (!wp_style_is('select2')) wp_enqueue_style('select2', CINCH_URL.'/vendor/select2/select2.css');
+
         }
+
     }
 
-    public function registerSection($group, $title, $page) {
+    public function registerSection($group, $title, $page)
+    {
         add_settings_section($group, $title, null, $page); //TODO: possibly add content output for callback?
     }
 
@@ -197,7 +258,6 @@ class AdminOptions extends cinch\Cinch {
 
     public static function scripts()
     {
-
         foreach (self::$scripts as $script) {
             if (parent::checkValidString($script['bundled']))  {
                 wp_enqueue_script($script);
@@ -210,7 +270,6 @@ class AdminOptions extends cinch\Cinch {
 
     public static function styles($hook)
     {
-
         foreach (self::$styles as $style) {
             if (strstr($hook, $style['hook'])) wp_enqueue_style($style['slug'], $style['source'], $style['dependencies'], $style['version']);
         }
