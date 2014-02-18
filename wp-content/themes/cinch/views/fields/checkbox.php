@@ -1,1 +1,2 @@
-<input type="checkbox" name="<?=$option['id']?>" id="<?=$option['id']?>" value="1"<?=($option['current'] ? ' checked="checked"' : '')?>>
+<input type="checkbox" <?=$option['attributes']?> value="1"<?=$option['populate']?>>
+<?=$option['populate']?>

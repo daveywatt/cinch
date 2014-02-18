@@ -17,6 +17,7 @@ class AdminOptions extends cinch\Cinch {
     {
 
         /* Add default initializer on theme activate */
+        //TODO: do we need to load defaults into database?
 
         /* Hook settings errors into admin notices */
         add_action('admin_notices', array(&$this, 'notices'));
@@ -64,7 +65,6 @@ class AdminOptions extends cinch\Cinch {
 
             /*if (parent::checkValidArray($page['submenus'])) {
                 foreach($menu['submenus'] as $parentSlug => $submenu) {
-                    //TODO: attach script/styles enqueuing to submenus
                     add_submenu_page($parentSlug, $submenu['page_title'], $submenu['menu_title'], $submenu['capability'], $submenu['slug'], $submenu['callback']);
                 }
             }*/
@@ -147,7 +147,7 @@ class AdminOptions extends cinch\Cinch {
 
             ?>
 
-            <?php submit_button('Save Options'); ?>
+            <?php submit_button('Save Options'); //TODO: allow relabel of submit button in option constructor ?>
 
         </form>
         <?php
@@ -172,12 +172,75 @@ class AdminOptions extends cinch\Cinch {
         /* Get current option data, merge into in existing option array - will also check if sub option exists */
         $option['current'] = get_option($option['id']);
 
-        if (isset($option['current']) && (isset($option['serialized']) && $option['serialized'])) {
+        print_r($option);
+
+        if (isset($option['current']) && (isset($option['serialized']) && $option['serialized']))
             $option['current'] = (isset($option['current'][$option['sub_id']]) ? $option['current'][$option['sub_id']] : '');
+
+        /* Field specific operations */ //TODO: do we need this in the future, cut back maybe?
+        /*switch($option['type']) {
+            case 'select':
+                $populateAttribute = 'selected';
+            break;
+            case 'checkbox':
+                $populateAttribute = 'checked';
+            break;
+
+            default: return false;
+        }*/
+
+        /* Add enhanced data attribute for select2 elements */
+        if ($option['type'] == 'select' && isset($option['enhanced']) && $option['enhanced'] == true)
+            $option['attributes']['data-enhanced'] = 'true';
+
+        /* Format attributes */
+        if (isset($option['attributes']) && parent::checkValidArray($option['attributes'])) { //TODO: attributes is now set by loadOptions, validate in top
+
+            $attributes = '';
+            foreach ($option['attributes'] as $index => $value) {
+                if (!is_numeric($index)) {
+                    $attributes .= ' '.$index.'="'.$value.'"';
+                } else {
+                    $attributes .= ' '.$value;
+                }
+            }
+        }
+
+        $option['attributes'] = (isset($attributes) ? $attributes : null);
+
+        /* Construct and inject current field value into option array */
+        //(($optionValue == $option['current'] || (is_array($option['current']) && in_array($optionValue, $option['current']))) ? ' selected="selected"' : '')
+
+        if (isset($option['current']) && $option['current'] != null) { //option value is set in database //TODO: shorten code, change to operator
+
+            if (is_array($option['current'])) { //populate serialized option values
+
+                foreach($option['options'] as $value) {
+                    $prop = (($option['type'] == 'select') ? ' selected' : (($option['type'] == 'checkbox') ? ' checked' : null));
+                    $option['populate'][$value] = (in_array($value, $option['current']) ? $prop : null);
+                }
+
+            } else {
+                $option['populate'] = (($option['type'] == 'select' && $option['current']) ? ' selected' : (($option['type'] == 'checkbox' && $option['current']) ? ' checked' : $option['current']));
+            }
+
+        } else { //option has not yet been saved
+
+            if (isset($option['options']) && is_array($option['options'])) {
+
+                foreach($option['options'] as $value) {
+                    $prop = (($option['type'] == 'select') ? ' selected' : (($option['type'] == 'checkbox') ? ' checked' : null));
+                    $option['populate'][$value] = (($option['default'] == $value) ? $prop : null);
+                }
+
+            } else {
+                $option['populate'] = (($option['type'] == 'select') ? ' selected' : (($option['type'] == 'checkbox') ? ' checked' : $option['default']));
+            }
         }
 
         /* Field callbacks can be over-ridden by defining a function using the cinch_adminOptions_field_[TYPE] prefix */
-        if (function_exists('cinch_adminOptions_field_'.$option['type'])) return call_user_func_array('cinch_adminOptions_field_'.$option['type'], $option);
+        if (function_exists('cinch_adminOptions_field_'.$option['type']))
+            return call_user_func_array('cinch_adminOptions_field_'.$option['type'], $option); //TODO: add more over-ride possibilities here
 
         /* Custom view requested? If so, we will call the view else use a field type */
         if ($option['type'] == 'custom' && isset($option['view'])) {
@@ -196,28 +259,6 @@ class AdminOptions extends cinch\Cinch {
         //TODO: capture view error here if it does not exist etc.
 
         $viewSource = ((CHILD_DIR && is_file(CHILD_DIR.$childViewPath)) ? CHILD_DIR.$childViewPath : CINCH_DIR.$cinchViewPath);
-
-        /* Format option id for view */
-        if (isset($option['sub_id']) && $option['sub_id'] != null)
-            $option['id'] = ((isset($option['multiple']) && $option['multiple']) ? $option['id'].'['.$option['sub_id'].'][]' : $option['id'].'['.$option['sub_id'].']');
-
-        /* Format attributes */
-        if (isset($option['attributes']) && parent::checkValidArray($option['attributes'])) {
-
-            $attributes = '';
-            foreach ($option['attributes'] as $index => $value) {
-                if (!is_numeric($index)) {
-                    $attributes .= ' '.$index.'="'.$value.'"';
-                } else {
-                    $attributes .= ' '.$value;
-                }
-            }
-        }
-
-        $option['attributes'] = (isset($attributes) ? $attributes : null);
-
-        /* Add enhanced data attribute for select2 elements */
-        if ($option['type'] == 'select' && isset($option['enhanced']) && $option['enhanced'] == true) $option['attributes'] .= ' data-enhanced="true"';
 
         /* Check for defaults */
         //if (!isset($option['current']) || $option['current'] == null)
@@ -262,6 +303,18 @@ class AdminOptions extends cinch\Cinch {
             //$option['sanitize'] = ((isset($option['sanitize']) && function_exists($option['sanitize'])) ? $option['sanitize'] : '');
 
             //TODO: work out how to handle sanitize here, we cant use on register_setting as it could be a serialized array
+
+            /* Format option id for view */
+            $option['view_id'] = ((isset($option['sub_id']) && $option['sub_id'] != null) ?
+                ((isset($option['multiple']) && $option['multiple']) ? $option['id'].'['.$option['sub_id'].'][]' : $option['id'].'['.$option['sub_id'].']')
+                : $option['id']);
+
+            /* Label output */
+            $option['label'] = '<label for="'.$option['view_id'].'">'.$option['label'].'</label>';
+
+            /* Construct attributes and merge view selector fields */
+            $option['attributes'] = ((isset($option['attributes']) && parent::checkValidArray($option['attributes']) ? $option['attributes'] : array()));
+            $option['attributes'] = array_merge(array('id' => $option['view_id'], 'name' => $option['view_id']), $option['attributes']);
 
             /* Register field and parse option array data to the field() function */
             add_settings_field($option['sub_id'], $option['label'], $callback, $option['page'], $option['group'], $option);
