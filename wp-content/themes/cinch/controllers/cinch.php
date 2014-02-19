@@ -1,30 +1,36 @@
 <?php
 /**
- * Cinch
- * cinch.php
+ * @name Cinch
+ *
  * This is the core cinch controller
+ *
+ * @package Cinch
+ * @version 0.2
  */
 
 namespace cinch;
+
+define('CINCH_VERSION', '0.0.1');
+define('CINCH_URL', get_template_directory_uri());
+define('CINCH_DIR', get_template_directory());
+define('CHILD_URL', (is_child_theme() ? get_stylesheet_directory_uri() : false));
+define('CHILD_DIR', (is_child_theme() ? get_stylesheet_directory() : false));
+define('ADMIN_CAPABILITY', 'manage_options');
+define(__NAMESPACE__.'\NS', __NAMESPACE__.'\\');
+define('CINCH_I18N', 'cinch');
+define('CINCH_CLASS', NS.'Cinch');
 
 class Cinch {
 
     public function __construct() {
 
-        /* Define constants */
-        define('CINCH_VERSION', '0.0.1');
-        define('CINCH_URL', get_stylesheet_directory_uri());
-        define('CINCH_DIR', get_stylesheet_directory());
-        define('ADMIN_CAPABILITY', 'manage_options');
-        define(__NAMESPACE__.'\NS', __NAMESPACE__.'\\');
-        define('CINCH_CLASS', NS.'Cinch');
-
         /* Include config file */
-        @require_once(CINCH_DIR.'/config.php');
+        require_once(CINCH_DIR.'/config.php');
 
         /* Autoload classes */
         $autoload = array_merge(array(
-            'controllers/AdminControls'
+            'controllers/AdminControls',
+            'controllers/AdminOptions'
         ), $autoload);
 
         foreach($autoload as $class) {
@@ -34,11 +40,14 @@ class Cinch {
         /* Create admin UI */
         \add_action('admin_menu', array(CINCH_CLASS, 'menu'), 9999);
 
-        /* Register admin CSS styles */
-        \add_action('admin_enqueue_scripts', array(CINCH_CLASS, 'adminStyles'));
+        /* Register admin global CSS styles */
+        add_action('admin_enqueue_scripts', array(CINCH_CLASS, 'globalStyles'));
+
+        /* Register admin global JS */
+        add_action('admin_enqueue_scripts', array(CINCH_CLASS, 'globalScripts'));
 
         /* Register settings */
-        \add_action('admin_init', array(CINCH_CLASS, 'adminSettings'));
+        //\add_action('admin_init', array(CINCH_CLASS, 'adminSettings'));
 
         /* Access control over-rides */
         \add_action('admin_init', array(CINCH_CLASS, 'accessControl'));
@@ -47,8 +56,10 @@ class Cinch {
     /* Check for developer administrator account */
     public static function isDeveloperAdmin() {
 
-        $option = get_option('__cinch_options');
+        $option = get_option('_cinch_options');
         $developer_account = (isset($option['developer_administrator_account']) ? $option['developer_administrator_account'] : '1');
+
+        //return true;
 
         return ((
             (isset($developer_account) && is_user_logged_in() && $user = wp_get_current_user())
@@ -64,33 +75,116 @@ class Cinch {
             && Cinch::checkValidOperator($cinchOptions)
             && (isset($cinchOptions['allow_client_cinch']) && $cinchOptions['allow_client_cinch'] === '1'))) {
 
-            /*$optionsPage = \add_menu_page('Options', 'Cinch', ADMIN_CAPABILITY, 'cinch', array(CINCH_CLASS, 'adminOptionsPage'), null, 3);
-            \add_submenu_page('cinch', 'Add-ons', 'Add-ons', ADMIN_CAPABILITY, 'cinch-addons', array(CINCH_CLASS, 'adminAddonsPage'));*/
+            $pages[] = array(
 
-            $adminPages = array(
-
-                'Cinch' => array(
-                    'title' => 'Options',
-                    'top_title' => 'Options',
-                    'capability' => ADMIN_CAPABILITY,
-                    'slug' => 'cinch',
-                    'function' => array(CINCH_CLASS, 'adminOptionsPage'),
-                    'icon' => array('css3', 'core'),
-                    'position' => 3,
-                    'scripts' => array('jquery-ui-core', 'jquery-ui-selectable', 'jquery-ui-sortable'),
-                    'submenus' => array(
-                        'cinch' => array(
-                            'page_title' => 'Add-ons',
-                            'menu_title' => 'Add-ons',
-                            'capability' => ADMIN_CAPABILITY,
-                            'slug' => 'cinch-addons',
-                            'function' => array(CINCH_CLASS, 'adminAddonsPage')
-                        )
+                'label' => __('Cinch', CINCH_I18N), //menu label
+                'sub_label' => __('Options', CINCH_I18N), //if sub menu pages are defined, will rename the top label
+                //'id' => '_cinch_options', //if id is provided, will assign section to this page
+                'capability' => ADMIN_CAPABILITY, //capability required for access
+                'slug' => 'cinch', //menu page slug, if not provided will default to label
+                'group' => 'cinch', //if this exists, will assign to this group, otherwise will default to slug
+                'icon' => [ //define icon, TODO: add support for types, images, css, custom
+                    'type' => 'css',
+                    'reference' => 'core'
+                ],
+                'position' => 3, //menu position
+                'scripts' => [ //define scripts only for these pages
+                    'jquery-ui' => [
+                        'bundled' => 'jquery-ui-core'
+                    ],
+                    'jquery-ui-selectable' => [
+                        'bundled' => 'jquery-ui-selectable'
+                    ],
+                    'jquery-ui-sortable' => [
+                        'bundled' => 'jquery-ui-sortable'
+                    ]
+                ]
+                /*'styles' => array( //define styles only for these pages
+                    'main' => array(
+                        'hook' => 'page_cinch',
+                        'slug' => 'cinch-css',
+                        'source' => CINCH_URL.'/css/cinch-admin.css',
+                        'dependencies' => array(),
+                        'version' => CINCH_VERSION
                     )
+                )*/
+            );
+
+            $subpages = array(
+
+                array(
+                    'page' => 'Cinch',
+                    'type' => 'tab',
+                    'label' => 'Cinch Options',
+                    'slug' => 'options',
+                    'id' => '_cinch_options'
+                ),
+                array(
+                    'page' => 'cinch',
+                    'type' => 'tab',
+                    'label' => 'Disable Features',
+                    'slug' => 'disable-features',
+                    'id' => '_cinch_wordpress_features'
+                ),
+                array(
+                    'page' => 'Cinch',
+                    'type' => 'tab',
+                    'label' => 'Access Control',
+                    'slug' => 'access-control',
+                    'id' => '_cinch_access_control',
+                    'labels' => false
                 )
             );
 
-            \AdminControls::menuPages($adminPages);
+            $options = array(
+
+                array(
+                    'page' => 'options', //attach to this admin page (must match the slug of a predefined page or sub-page)
+                    'label' => __('Developer accounts', CINCH_I18N), //label for field option
+                    'description' => '', //will include this description in HTML if provided
+                    'group' => '_cinch_options', //this must match the options group as defined in the associated page or sub-page
+                    'id' => array('_cinch_options', 'developer_accounts'), //if id is an array, will parse second parameter into a serialised array
+                    'multiple' => true, //if true, will register array field for multiple values
+                    'type' => 'select', //this will result in relevant field include
+                    'attributes' => array('multiple', 'placeholder' => 'Please select developer accounts'), //must be array, any attributes here will be added to field tag
+                    'enhanced' => true, //if true, uses select2 for advanced input field controls, can also be array of select2 options
+                    'sanitize' => null, //if exists will parse this function as sanitize parameter
+                    'callback' => '', //if callback is present, use custom callback function (ARRAY WITH EXTRA ARGUMENTS) type must be defined as custom!
+                    'options' => self::getAdminUserOptions(), //if select field will accept options as array key => values (label => value)
+                    'default' => '1', //will use this default if option not set
+                    'help' => _('Choose developer accounts from the list of administrators.')
+                ),
+                array(
+                    'page' => 'options',
+                    'label' => __('Allow client access', CINCH_I18N),
+                    'group' => '_cinch_options',
+                    'id' => array('_cinch_options', 'allow_client_access'),
+                    'type' => 'checkbox',
+                    'default' => 0,
+                    'description' => 'Check this option to allow clients to access the cinch control panel.'
+                ),
+                array(
+                    'page' => 'disable-features',
+                    'label' => __('Disable comments', CINCH_I18N),
+                    'group' => '_cinch_wordpress_features',
+                    'id' => '_cinch_wordpress_features',
+                    'sanitize' => 'intval',
+                    'type' => 'checkbox',
+                    'default' => false,
+                    'help' => 'Checking this option will disable all comments.'
+                ),
+                array(
+                    'page' => 'access-control',
+                    'label' => null,
+                    'group' => '_cinch_access_control',
+                    'id' => '_cinch_access_control',
+                    'type' => 'custom',
+                    'view' => 'access-control'
+                )
+
+            );
+
+            new \AdminOptions($pages, $subpages, CINCH_DIR.'/views/admin-options.php', $options);
         }
 
         if (!Cinch::isDeveloperAdmin()) {
@@ -99,12 +193,6 @@ class Cinch {
             global $menu, $submenu, $menuOrder;
             $accessControl = get_option('__cinch_access_control');
 
-            /*foreach ($menu as $menuKey => $menuItem) {
-                echo $menuKey;
-                //if ($menuItem[2] === $accessControl['pointer'])
-                   // unset($menu[$menuKey]);
-            }*/
-
             /* Remove menu pages if restricted, rename if label differs */
             if (Cinch::checkValidOperator($accessControl)) {
                 foreach ($accessControl as $position => $access) {
@@ -112,7 +200,6 @@ class Cinch {
                     if (isset($access['restricted']) && $access['restricted'] === 'true') {
                         \remove_menu_page(str_replace('admin.php?page=', '', $access['pointer']));
                     }
-
 
                     /* Rename menu item to option label */
                     if (isset($access['label']) && isset($menu[$position][0])) $menu[$position][0] = $access['label'];
@@ -136,395 +223,33 @@ class Cinch {
                 \add_filter('custom_menu_order', '__return_true');
                 \add_filter('menu_order', function() { global $menuOrder; return $menuOrder; });
             }
-
-            /*foreach ($submenu as $subMenuKey => $subMenuItem) {
-                foreach ($subMenuItem as $subMenuChild) {
-                    if (Cinch::array_key_exists_r($subMenuChild[2], $accessControl))
-                        unset($submenu[$subMenuKey]);
-                }
-            }*/
         }
-    }
-
-    /* Enqueue admin CSS */
-    public static function adminStyles($hook) {
-        if (strstr($hook, 'page_cinch')) wp_enqueue_style('cinch-css', CINCH_URL.'/css/cinch-admin.css', array(), CINCH_VERSION);
-    }
-
-    /* Cinch administration - Settings */
-    public static function adminSettings() {
-
-        $sections = array(
-            '__cinch_options' => array(
-                'title' => '',
-                'content' => '',
-                'page' => 'cinch-options'
-            ),
-            '__cinch_wordpress_features' => array(
-                'title' => '',
-                'content' => '',
-                'page' => 'cinch-disable-features'
-            ),
-            '__cinch_access_control' => array(
-                'title' => 'Client Access Control',
-                'content' => function() {
-                ?>
-
-                <div id="access-control-instructions">
-                    <p><?=__('Select a menu page to disable client access to the relevant section.')?>
-                    <br />Use the <strong>CTRL</strong> key (Windows) or <strong>CMD &#8984;</strong> key (Mac) to deselect or select multiple items.</p>
-                </div>
-
-                <?php
-
-                },
-                'page' => 'cinch-access-control'
-            )
-        );
-
-        /* Setup sections */
-        foreach($sections as $group => $parameters) {
-            \add_settings_section($group, $parameters['title'], $parameters['content'], $parameters['page']);
-        }
-
-        /* Option fields */
-        $options = array(
-
-            /* Cinch global options */
-            array(
-                'title' => 'Developer account',
-                'group' => '__cinch_options',
-                'id' => '__cinch_options',
-                'sanitize' => '',
-                'html' => function() {
-
-                        $option = \get_option('__cinch_options');
-
-                        /* Developer administrator account select */
-                        $optionId = 'developer_administrator_account';
-
-                        if (($adminUsers = \get_users(array('role' => 'administrator', 'orderby' => 'registered'))) && !empty($adminUsers)) {
-
-                            ?>
-
-                            <select name="__cinch_options[<?=$optionId?>]" id="__cinch_options[<?=$optionId?>]">
-
-                                <?php foreach ($adminUsers as $user) { ?>
-                                    <option value="<?=$user->data->ID?>"<?=($option[$optionId] === $user->data->ID ? ' selected="selected"' : '')?>>
-                                        <?=$user->data->user_login?> (<?=$user->data->user_email?>)
-                                    </option>
-                                <?php } ?>
-
-                            </select>
-
-                            <?php } else { ?>
-                                <em><?=__('No administrators were found!')?></em>
-                            <?php
-                        }
-
-                        /* Allow client access to cinch */
-                        $optionId = 'allow_client_cinch';
-                        ?>
-
-                        </td>
-                        </tr>
-
-                        <tr valign="top">
-                            <th scope="row">
-                                <label for="__cinch_options[<?=$optionId?>]"><?=__('Allow client access to Cinch')?></label>
-                            </th>
-                            <td>
-                                <input type="checkbox" name="__cinch_options[<?=$optionId?>]" id="__cinch_options[<?=$optionId?>]" value="1"<?=($option[$optionId] == '1' ? ' checked="checked"' : '')?>>
-                            </td>
-                        </tr>
-
-                        <?php
-
-                },
-                'page' => 'cinch-options',
-                'default' => array(
-                    'developer_administrator_account' => '1',
-                    'allow_client_cinch' => '0'
-                )
-            ),
-
-            /* Disable Wordpress features */
-            array(
-                'title' => 'Disable comments',
-                'group' => '__cinch_wordpress_features',
-                'id' => '__cinch_wordpress_features',
-                'sanitize' => 'intval',
-                'html' => function() {
-
-                    $option = \get_option('__cinch_wordpress_features');
-
-                    /* Disable comments */
-                    $optionId = 'comments';
-                    ?>
-
-                    <input type="checkbox" name="__cinch_wordpress_features[<?=$optionId?>]" id="__cinch_wordpress_features[<?=$optionId?>]" value="1"<?=($option[$optionId] == '1' ? ' checked="checked"' : '')?>>
-
-                    </td>
-                    </tr>
-
-                    <?php $optionId = 'attachment_pages'; ?>
-
-                    <tr valign="top">
-                        <th scope="row">
-                            <label for="__cinch_options[<?=$optionId?>]"><?=__('Disable attachment pages')?></label>
-                        </th>
-                        <td>
-                            <input type="checkbox" name="__cinch_options[<?=$optionId?>]" id="__cinch_options[<?=$optionId?>]" value="1"<?=($option[$optionId] == '1' ? ' checked="checked"' : '')?>>
-                        </td>
-                    </tr>
-
-                    <?php
-
-                },
-                'page' => 'cinch-disable-features',
-                'default' => '1'
-            ),
-
-            /* Access Control */
-            array(
-                'title' => 'Disable client access',
-                'group' => '__cinch_access_control',
-                'id' => '__cinch_access_control',
-                'sanitize' => '',
-                'html' => function() {
-
-                        global $menu;
-                        global $submenu;
-
-                        $optionID = '__cinch_access_control';
-                        $option = \get_option($optionID);
-
-                        // echo '<pre>'; print_r($option); echo '</pre>';
-
-                        /* Sort menu array as per option order, but only if menu is not set */
-                        $menuOperator = $menu;
-                        if (Cinch::checkValidOperator($option)) {
-                            $menuOperator = array();
-                            foreach($option as $position => $menuItem) {
-                                /* Check for removed menu items */
-                                if (!isset($menu[$position]) || ($menu[$position][2] !== $menuItem['pointer']
-                                        && 'admin.php?page='.$menu[$position][2] !== $menuItem['pointer'])) continue;
-                                $menuOperator[$position] = $menu[$position];
-                            }
-                        }
-
-                        $menuCounter = 0;
-                        ?>
-
-                        <p>
-                            <button id="access-control-clear" class="button button-secondary">Re-enable all</button>
-                        </p>
-
-                        <div id="cinch-access-control">
-
-                            <?php foreach ($menuOperator as $menuPosition => $menuItem) { if ($menuItem[0] === 'Cinch') continue; ?>
-
-                                <?php
-                                $menuCounter++;
-                                $topItemPointer = (strstr($menuItem[2], '.php') !== false ? $menuItem[2] : 'admin.php?page='.$menuItem[2]);
-                                $isRestricted = ($option[$menuPosition]['restricted'] == 'true' ? true : false);
-                                $topLabel = ($option[$menuPosition]['label'] != null ?
-                                    $option[$menuPosition]['label'] : trim(preg_replace('/[0-9]+/', '', strip_tags($menuItem[0]))));
-                                ?>
-
-                                <?php if ($menuItem[4] === 'wp-menu-separator') { ?>
-
-                                    <ul class="cinch-access-control seperator">
-                                        <span class="item-position-badge">
-                                            <span><?=$menuCounter?></span>
-                                        </span>
-                                        <li class="ui-widget-content top-item" data-position="<?=$menuPosition?>" data-pointer="<?=$menuItem[2]?>">&nbsp;</li>
-                                        <input type="hidden" name="<?=$optionID?>[<?=$menuPosition?>][pointer]" class="item-is-active" value="<?=$menuItem[2]?>" />
-                                        <!-- <input type="hidden" name="<?=$optionID?>[<?=$menuPosition?>][label]" value="seperator" /> -->
-                                        <!-- <input type="hidden" name="<?=$optionID?>[<?=$menuPosition?>][position]" class="item-position" value="<?=$menuPosition?>" /> -->
-                                    </ul>
-
-                                <?php } else {  ?>
-
-                                    <ul class="cinch-access-control">
-                                        <li class="ui-widget-content item top-item<?=($isRestricted ? ' ui-selected' : '')?>" data-position="<?=$menuPosition?>" data-pointer="<?=$topItemPointer?>" data-label="<?=$topLabel?>">
-                                            <span class="item-label-rename">
-                                                <?=$topLabel?>
-                                            </span>
-                                            <span class="item-position-badge">
-                                                <span><?=$menuCounter?></span>
-                                            </span>
-                                            <?php //($isActive ? '<input type="hidden" name="'.$optionID.'[]['.$topItemPointer.']" id="'.$optionID.'[]['.$topItemPointer.']" value="true" />' : '')?>
-                                            <input type="hidden" name="<?=$optionID?>[<?=$menuPosition?>][restricted]" class="item-is-restricted" value="<?=($isRestricted ? 'true' : 'false')?>" />
-                                            <input type="hidden" name="<?=$optionID?>[<?=$menuPosition?>][pointer]" value="<?=$topItemPointer?>" />
-                                            <input type="hidden" name="<?=$optionID?>[<?=$menuPosition?>][label]" class="item-label" value="<?=$topLabel?>" />
-                                            <!-- <input type="hidden" name="<?=$optionID?>[<?=$menuPosition?>][position]" class="item-position" value="<?=$menuPosition?>" /> -->
-                                        </li>
-
-                                        <?php if (isset($submenu[$menuItem[2]])) { ?>
-
-                                            <ul class="cinch-access-control-subs">
-
-                                            <?php foreach($submenu[$menuItem[2]] as $subMenuPosition => $subMenuItem) { ?>
-
-                                                <?php
-                                                $subItemPointer = (strstr($subMenuItem[2], '.php') !== false ? $subMenuItem[2] : 'admin.php?page='.$subMenuItem[2]);
-                                                $isRestricted = ($option[$menuPosition]['submenu'][$subMenuPosition]['restricted'] == 'true' ? true : false);
-                                                $subLabel = ($option[$menuPosition]['submenu'][$subMenuPosition]['label'] != null ?
-                                                    $option[$menuPosition]['submenu'][$subMenuPosition]['label'] : trim(preg_replace('/[0-9]+/', '', strip_tags($subMenuItem[0]))));
-                                                ?>
-
-                                                <li class="ui-widget-content item sub-item<?=($isRestricted ? ' ui-selected' : '')?>" data-position="<?=$subMenuPosition?>" data-pointer="<?=$subItemPointer?>" data-label="<?=$subLabel?>">
-                                                    <span class="item-label-rename">
-                                                        <?=$subLabel?>
-                                                    </span>
-                                                    <?php //($isActive ? '<input type="hidden" name="'.$optionID.'[]['.$subItemPointer.']" id="'.$optionID.'[]['.$subItemPointer.']" value="true" />' : '')?>
-                                                    <input type="hidden" name="<?=$optionID?>[<?=$menuPosition?>][submenu][<?=$subMenuPosition?>][restricted]" class="item-is-restricted" value="<?=($isRestricted ? 'true' : 'false')?>" />
-                                                    <input type="hidden" name="<?=$optionID?>[<?=$menuPosition?>][submenu][<?=$subMenuPosition?>][pointer]" value="<?=$subItemPointer?>" />
-                                                    <input type="hidden" name="<?=$optionID?>[<?=$menuPosition?>][submenu][<?=$subMenuPosition?>][label]" class="item-label" value="<?=$subLabel?>" />
-                                                   <!-- <input type="hidden" name="<?=$optionID?>[<?=$menuPosition?>][submenu][<?=$subMenuPosition?>][position]" class="item-position" value="<?=$subMenuPosition?>" /> -->
-                                                </li>
-
-                                            <?php } ?>
-
-                                            </ul>
-
-                                        <?php } ?>
-
-                                    </ul>
-
-                            <?php
-                                }
-                            }
-                            ?>
-
-                        </div>
-
-                        <script>
-                            jQuery(function($) {
-
-                                $('#cinch-access-control').sortable({
-                                    handle: '.item-position-badge',
-                                    connectWith: '.cinch-column',
-                                    stop: function(event, ui) {
-                                        $.each($(this).find('.cinch-access-control'), function() {
-                                            $(this).find('li.top-item').attr('data-position', $(this).index());
-                                            $(this).find('input.item-position').val($(this).index());
-                                            $(this).find('.item-position-badge span').html(($(this).index()+1));
-                                        });
-                                    }
-                                }).disableSelection();
-
-                                /*$('.cinch-access-control-subs').sortable({
-                                    handle: '.sub-handle',
-                                    stop: function(event, ui) {
-                                        $.each($(this).find(''), function() {
-                                            $(this).find('li').attr('data-position', $(this).index());
-                                            $(this).find('input.item-position').val($(this).index());
-                                        });
-                                    }
-                                }).disableSelection();*/
-
-                                $('.cinch-access-control:not(.seperator)').mousedown(function(e){e.metaKey = true}).selectable({
-                                        filter: 'li',
-                                        cancel: '.item-position-badge',
-                                        selected: function(event, ui) {
-                                            $(ui.selected).find('input.item-is-restricted').val('true');
-                                            $('.cinch-access-control li').find('input').blur();
-                                        },
-                                        unselected: function(event, ui) {
-                                            //$(ui.unselected).find('input').remove();
-                                            $(ui.unselected).find('input.item-is-restricted').val('false');
-                                            $('.cinch-access-control li').find('input').blur();
-                                        }
-                                    }
-                                );
-
-                                var rename = function() {
-
-                                    $('.cinch-access-control li span').dblclick(function(e) {
-
-                                        e.preventDefault();
-
-                                        var currentName = $(this).html(),
-                                            fillWidth = $(this).parent().width();
-
-                                        if (!$(this).hasClass('renaming')) {
-
-                                            var parentItem = $(this).parent();
-
-                                            parentItem.removeClass('ui-selected');
-                                            $(this).unbind('dblclick').addClass('renaming').html('').append('<input type="text" value="'+currentName+'" />')
-                                                .find('input').css({width:fillWidth+'px'}).focus().select().bind('blur', function() {
-
-                                                var newVal = (typeof $(this).val() !== 'undefined' && $(this).val().length > 0 ? $(this).val() : currentName);
-                                                $(this).parent('span.item-label-rename').removeClass('renaming').html(newVal);
-                                                parentItem.find('input.item-label').val(newVal);
-                                                $(this).remove();
-                                                rename();
-                                            });
-                                        }
-                                    });
-                                };
-                                rename();
-
-                                $('#access-control-clear').click(function(e) {
-                                    e.preventDefault();
-                                    $('.item-is-restricted').val('false');
-                                    $('.ui-widget-content').removeClass('ui-selected');
-
-                                })
-                            });
-                        </script>
-
-                        <?php //echo '<pre>'; print_r($option); echo '</pre>'; ?>
-
-                    <?php
-                },
-                'page' => 'cinch-access-control',
-                'default' => '1'
-            )
-        );
-
-        /* Setup fields */
-        foreach($options as $option) {
-            //TODO: add options on theme activate?
-            /*if (get_option($option['id']) == false) {
-                $default = (is_array($option['default']) ? serialize($option['default']) : $option['default']);
-                add_option($option['id'], $default);
-            }*/
-            \add_settings_field($option['id'], __($option['title']), $option['html'], $option['page'], $option['group'], array('label_for' => $option['id']));
-            \register_setting($option['group'], $option['id'], $option['sanitize']);
-        }
-    }
-
-    /* Cinch administration - Global options page */
-    public static function adminOptionsPage() {
-
-        $data = array (
-            'action' => 'options.php'
-        );
-        Cinch::view('admin-options', $data);
-    }
-
-    /* Cinch administration - Addons page */
-    public static function adminAddonsPage() {
-        echo 'ADDONS VIEW HERE';
     }
 
     public static function view($fileName, $array = array()) {
 
-        if (isset($array) && !empty($array))
+        if (isset($array) && !empty($array)) {
             foreach ($array as $index => $value) {
                 $$index = $value;
+                if ($index === 'group') {
+                    $optionObject = \get_option('group');
+                }
             }
+        }
+        include(CINCH_DIR.'/views/'.$fileName.'.php');
+    }
 
-        @include(CINCH_DIR.'/views/'.$fileName.'.php');
+    public static function globalStyles() {
+        \wp_enqueue_style('cinch', CINCH_URL.'/css/cinch.css', array(), CINCH_VERSION);
+    }
+
+    public static function globalScripts() {
+        \wp_enqueue_script('cinch', CINCH_URL.'/js/cinch.js', array('jquery'), CINCH_VERSION);
     }
 
     public static function accessControl() {
-        if (Cinch::accessControlCheck()) return true;
 
+        if (Cinch::accessControlCheck()) return true;
         $data = array (
             'message' => 'You do not have sufficient permissions to access this page.'
         );
@@ -533,14 +258,15 @@ class Cinch {
     }
 
     public static function accessControlCheck() {
+
         $currentRequest = explode('/', \add_query_arg(null, null));
         $currentRequest = end($currentRequest);
 
         if (!Cinch::isDeveloperAdmin()) {
 
             /* Get required options */
-            $cinchOptions = get_option('__cinch_options');
-            $accessControl = get_option('__cinch_access_control');
+            $cinchOptions = get_option('_cinch_options');
+            $accessControl = get_option('_cinch_access_control');
 
             /* Check for Cinch request */
             if (Cinch::checkValidOperator($cinchOptions)
@@ -560,15 +286,36 @@ class Cinch {
         return true;
     }
 
+    /**
+     * @function getAdminUserOptions
+     * @params none
+     * @returns Array((string) user's name, (id) user's id)
+     *
+     * Fetches all admin users from WordPress and returns array ready for an adminOptions select field
+     */
+
+    public static function getAdminUserOptions() {
+        $adminUsers = array();
+        foreach(\get_users(array('role' => 'administrator', 'orderby' => 'registered')) as $user) {
+            $adminUsers[$user->data->user_nicename.' ('.$user->data->user_email.')'] = $user->data->ID;
+        }
+        return $adminUsers;
+    }
+
     /* Utility functions */
-    public static function array_key_exists_r($needle, $haystack) {
+    public static function arrayKeyExistsRecursive($needle, $haystack) {
         foreach ($haystack as $item) if (array_key_exists($needle, $item)) return true;
         return false;
     }
 
-    public static function in_array_r($needle, $haystack) {
-        foreach ($haystack as $item) if (in_array($needle, $item)) return true;
+    public static function inArrayRecursive($needle, $haystack, $return = false) {
+        foreach ($haystack as $item) if (in_array($needle, $item))
+            return ($return ? $item : true);
         return false;
+    }
+
+    public static function viewExists($fileName) {
+        return (is_file(CINCH_DIR.'/views/'.$fileName.'.php'));
     }
 
     public static function checkValidOperator($option) {
@@ -583,8 +330,8 @@ class Cinch {
         return ((isset($array) && $array != null && !empty($array) && count($array) > 0) ? true : false);
     }
 
-
 }
 
+//TODO: review this, do we need to globalise the class?
 global $cinch;
 $cinch = new Cinch();

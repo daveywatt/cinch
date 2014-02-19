@@ -145,3 +145,34 @@ body {
 .select2-container {
     min-width: 280px;
 }
+
+.cinch-tooltip,
+.cinch-tooltip:hover {
+    display: block;
+    text-decoration: none;
+    cursor: pointer;
+    outline: 0;
+}
+
+.cinch-dashicon:before {
+    font: 400 30px/1 dashicons !important;
+    speak: none;
+    color: #999;
+    height: 30px;
+    width: 30px;
+    display: inline-block;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -moz-transition: all .1s ease-in-out;
+    -webkit-transition: all .1s ease-in-out;
+    transition: all .1s ease-in-out;
+}
+
+.cinch-icon-help {
+    float: left;
+    margin-right: 20px;
+}
+
+.cinch-icon-help:before {
+    content: "\f223";
+}

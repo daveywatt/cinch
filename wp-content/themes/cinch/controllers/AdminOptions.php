@@ -25,13 +25,10 @@ class AdminOptions extends cinch\Cinch {
         /* Construct class globals */
         $this->pages = $pages;
         $this->subpages = $subpages;
-
         $this->tabs = array();
         $this->activeTab = false;
-
         $this->template = $template;
         $this->options = $options;
-
         $this->sections = array();
 
         /* Initialise pages */
@@ -172,22 +169,9 @@ class AdminOptions extends cinch\Cinch {
         /* Get current option data, merge into in existing option array - will also check if sub option exists */
         $option['current'] = get_option($option['id']);
 
-        print_r($option);
-
+        /* Extract serialised values from current option if required */
         if (isset($option['current']) && (isset($option['serialized']) && $option['serialized']))
             $option['current'] = (isset($option['current'][$option['sub_id']]) ? $option['current'][$option['sub_id']] : '');
-
-        /* Field specific operations */ //TODO: do we need this in the future, cut back maybe?
-        /*switch($option['type']) {
-            case 'select':
-                $populateAttribute = 'selected';
-            break;
-            case 'checkbox':
-                $populateAttribute = 'checked';
-            break;
-
-            default: return false;
-        }*/
 
         /* Add enhanced data attribute for select2 elements */
         if ($option['type'] == 'select' && isset($option['enhanced']) && $option['enhanced'] == true)
@@ -208,35 +192,8 @@ class AdminOptions extends cinch\Cinch {
 
         $option['attributes'] = (isset($attributes) ? $attributes : null);
 
-        /* Construct and inject current field value into option array */
-        //(($optionValue == $option['current'] || (is_array($option['current']) && in_array($optionValue, $option['current']))) ? ' selected="selected"' : '')
-
-        if (isset($option['current']) && $option['current'] != null) { //option value is set in database //TODO: shorten code, change to operator
-
-            if (is_array($option['current'])) { //populate serialized option values
-
-                foreach($option['options'] as $value) {
-                    $prop = (($option['type'] == 'select') ? ' selected' : (($option['type'] == 'checkbox') ? ' checked' : null));
-                    $option['populate'][$value] = (in_array($value, $option['current']) ? $prop : null);
-                }
-
-            } else {
-                $option['populate'] = (($option['type'] == 'select' && $option['current']) ? ' selected' : (($option['type'] == 'checkbox' && $option['current']) ? ' checked' : $option['current']));
-            }
-
-        } else { //option has not yet been saved
-
-            if (isset($option['options']) && is_array($option['options'])) {
-
-                foreach($option['options'] as $value) {
-                    $prop = (($option['type'] == 'select') ? ' selected' : (($option['type'] == 'checkbox') ? ' checked' : null));
-                    $option['populate'][$value] = (($option['default'] == $value) ? $prop : null);
-                }
-
-            } else {
-                $option['populate'] = (($option['type'] == 'select') ? ' selected' : (($option['type'] == 'checkbox') ? ' checked' : $option['default']));
-            }
-        }
+        /* Populate field value for view output */
+        $option['populate'] = $this->populateField($option);
 
         /* Field callbacks can be over-ridden by defining a function using the cinch_adminOptions_field_[TYPE] prefix */
         if (function_exists('cinch_adminOptions_field_'.$option['type']))
@@ -260,19 +217,21 @@ class AdminOptions extends cinch\Cinch {
 
         $viewSource = ((CHILD_DIR && is_file(CHILD_DIR.$childViewPath)) ? CHILD_DIR.$childViewPath : CINCH_DIR.$cinchViewPath);
 
-        /* Check for defaults */
-        //if (!isset($option['current']) || $option['current'] == null)
-            //$option['current'] = (isset($option['default']) ? $option['default'] : (($option['type'] == 'select' || $option['type'] == 'checkbox') ? false : ''));
-
         //TODO: tooltips on [help]
         //TODO: descriptions on fields
         //TODO: custom validation on inputs
+        //TODO: sanitation on fields
 
-        //TODO: reduce amount of logic in views?
+        if (isset($viewSource) && is_file($viewSource)) {
 
-        if (isset($viewSource) && is_file($viewSource))
-            return require($viewSource);
+            require($viewSource);
 
+            /* Add help tooltips to view */
+            if (isset($option['help']) && $option['help'] != null)
+                echo '<a class="cinch-dashicon cinch-icon-help cinch-tooltip" data-toggle="tooltip" data-placement="top" title="'.$option['help'].'"><br /></a>';
+
+            return true;
+        }
         return false;
     }
 
@@ -287,9 +246,11 @@ class AdminOptions extends cinch\Cinch {
 
             /* Format option slug based on id */
             if (is_array($option['id']) && count($option['id']) == 2) {
+
                 $option['sub_id'] = $option['id'][1];
                 $option['id'] = $option['id'][0];
                 $option['serialized'] = true;
+
             } else {
                 $option['sub_id'] = $option['id'];
             }
@@ -305,12 +266,10 @@ class AdminOptions extends cinch\Cinch {
             //TODO: work out how to handle sanitize here, we cant use on register_setting as it could be a serialized array
 
             /* Format option id for view */
-            $option['view_id'] = ((isset($option['sub_id']) && $option['sub_id'] != null) ?
-                ((isset($option['multiple']) && $option['multiple']) ? $option['id'].'['.$option['sub_id'].'][]' : $option['id'].'['.$option['sub_id'].']')
-                : $option['id']);
+            $option['view_id'] = ((isset($option['sub_id']) && $option['sub_id'] != null) ? $option['id'].'['.$option['sub_id'].'][]' : $option['id']);
 
             /* Label output */
-            $option['label'] = '<label for="'.$option['view_id'].'">'.$option['label'].'</label>';
+            $option['label'] = '<label class="cinch-adminoptions-label" for="'.$option['view_id'].'">'.$option['label'].'</label>'."\n";
 
             /* Construct attributes and merge view selector fields */
             $option['attributes'] = ((isset($option['attributes']) && parent::checkValidArray($option['attributes']) ? $option['attributes'] : array()));
@@ -326,7 +285,59 @@ class AdminOptions extends cinch\Cinch {
                 if (!wp_style_is('select2')) wp_enqueue_style('select2', CINCH_URL.'/vendor/select2/select2.css');
             }
 
+            /* Check for tooltip / popover field option(s), include and initialise as required */
+            if (isset($option['help']) && $option['help']) {
+                if (!wp_script_is('cinch_bootstrap')) wp_enqueue_script('cinch_bootstrap', CINCH_URL.'/vendor/bootstrap/bootstrap.min.js', array('jquery'));
+                if (!wp_style_is('cinch_bootstrap')) wp_enqueue_style('cinch_bootstrap', CINCH_URL.'/vendor/bootstrap/bootstrap.min.css');
+            }
+
         }
+
+    }
+
+    public function populateField($option) {
+
+        $population = array();
+
+        /* Field specific operations */
+        switch($option['type']) {
+            case 'select':
+                $population['attribute'] = ' selected';
+                break;
+            case 'checkbox':
+                $population['attribute'] = ' checked';
+                break;
+
+            default: $population['attribute'] = false;
+        }
+
+        /* Construct and inject current field value into option array */
+        if (isset($option['current']) && $option['current'] != null) { //TODO: there has to be a better way
+
+            /* Option is a serialized array, populate each value dependant on type */
+            if (is_array($option['current']) && (isset($option['options']) && is_array($option['options']))) {
+
+                foreach($option['options'] as $value) {
+                    $population[$value] = ((in_array($value, $option['current']) && $population['attribute']) ? $population['attribute'] : (in_array($value, $option['current']) ? $option['current'] : null));
+                }
+
+            } else {
+                $population = (($option['current'] && $population['attribute']) ? $population['attribute'] : $option['current']);
+            }
+
+        } else { //option has not yet been saved
+
+            if (isset($option['options']) && is_array($option['options'])) {
+
+                foreach($option['options'] as $value) {
+                    $population[$value] = (($option['default'] == $value) ? $population['attribute'] : null);
+                }
+
+            } else {
+                $population = (($population['attribute'] && (isset($option['default']) && $option['default'])) ? $population['attribute'] : (isset($option['default']) ? $option['default'] : null));
+            }
+        }
+        return $population;
 
     }
 
