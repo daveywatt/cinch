@@ -1,6 +1,6 @@
 <?php
 /**
- * @name AdminOptions
+ * Class AdminOptions
  *
  * Streamlines the process of adding admin options to WordPress
  *
@@ -8,12 +8,13 @@
  *
  */
 
-class AdminOptions extends cinch\Cinch {
+class AdminOptions extends Cinch
+{
 
-    private static $scripts;
-    private static $styles;
+    protected static $scripts;
+    protected static $styles;
 
-    public function __construct($pages, $subpages = array(), $template = false, $options = array())
+    function __construct($pages, $subpages = array(), $template = false, $options = array())
     {
 
         /* Add default initializer on theme activate */
@@ -36,7 +37,7 @@ class AdminOptions extends cinch\Cinch {
 
     }
 
-    public function pages($arguments)
+    protected function pages($arguments)
     {
 
         foreach ($arguments as $page)
@@ -77,7 +78,7 @@ class AdminOptions extends cinch\Cinch {
         $this->loadOptions();
     }
 
-    public function subpages($arguments)
+    protected function subpages($arguments)
     {
 
         foreach ($arguments as $subpage)
@@ -98,7 +99,7 @@ class AdminOptions extends cinch\Cinch {
 
     }
 
-    public function tabs()
+    protected function tabs()
     {
 
         /**
@@ -129,7 +130,7 @@ class AdminOptions extends cinch\Cinch {
 
     }
 
-    public function options()
+    protected function options()
     {
         ?>
         <form method="post" action="options.php">
@@ -153,7 +154,7 @@ class AdminOptions extends cinch\Cinch {
     public function template()
     {
         $adminOptions = $this;
-        require_once($this->template);
+        require($this->template);
     }
 
     public static function notices()
@@ -196,26 +197,36 @@ class AdminOptions extends cinch\Cinch {
         $option['populate'] = $this->populateField($option);
 
         /* Field callbacks can be over-ridden by defining a function using the cinch_adminOptions_field_[TYPE] prefix */
-        if (function_exists('cinch_adminOptions_field_'.$option['type']))
-            return call_user_func_array('cinch_adminOptions_field_'.$option['type'], $option); //TODO: add more over-ride possibilities here
+        if (function_exists('cinch_options_field_'.$option['type']))
+            return call_user_func_array('cinch_options_field_'.$option['type'], $option); //TODO: add more over-ride possibilities here?
+
+        $viewFile = (($option['type'] == 'custom' && isset($option['view'])) ? 'views/'.$option['view'].'.php' : 'views/fields/'.$option['type'].'.php');
+        $optionView = parent::view($viewFile, array('option' => $option));
+        if (!$optionView) {
+            parent::$notices[] = array(
+                'message' => 'View file does not exist',
+                'error' => true
+            );
+        }
+
 
         /* Custom view requested? If so, we will call the view else use a field type */
-        if ($option['type'] == 'custom' && isset($option['view'])) {
+        /*if ($option['type'] == 'custom' && isset($option['view'])) {
 
-            /* Check for child template file and over-ride if exists */ //TODO: should we use locate_template here?
+            /* Check for child template file and over-ride if exists  //TODO: should we use locate_template here?
             $childViewPath = '/cinch/'.$option['view'].'.php';
             $cinchViewPath = '/views/'.$option['view'].'.php';
 
         } else {
 
-            /* Check for child template file and over-ride if exists */ //TODO: should we use locate_template here?
+            /* Check for child template file and over-ride if exists  //TODO: should we use locate_template here?
             $childViewPath = '/cinch/fields/'.$option['type'].'.php';
             $cinchViewPath = '/views/fields/'.$option['type'].'.php';
-        }
+        }*/
 
         //TODO: capture view error here if it does not exist etc.
 
-        $viewSource = ((CHILD_DIR && is_file(CHILD_DIR.$childViewPath)) ? CHILD_DIR.$childViewPath : CINCH_DIR.$cinchViewPath);
+        //$viewSource = ((CHILD_DIR && is_file(CHILD_DIR.$childViewPath)) ? CHILD_DIR.$childViewPath : CINCH_DIR.$cinchViewPath);
 
         //TODO: tooltips on [help]
         //TODO: descriptions on fields
@@ -232,7 +243,8 @@ class AdminOptions extends cinch\Cinch {
 
             return true;
         }
-        return false;
+
+return false;
     }
 
     public function loadOptions()
@@ -353,7 +365,7 @@ class AdminOptions extends cinch\Cinch {
 
     }
 
-    public static function scripts()
+    public function scripts()
     {
         foreach (self::$scripts as $script) {
             if (parent::checkValidString($script['bundled']))  {
@@ -365,7 +377,7 @@ class AdminOptions extends cinch\Cinch {
         }
     }
 
-    public static function styles($hook)
+    public function styles($hook)
     {
         foreach (self::$styles as $style) {
             if (strstr($hook, $style['hook'])) wp_enqueue_style($style['slug'], $style['source'], $style['dependencies'], $style['version']);

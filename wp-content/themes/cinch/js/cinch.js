@@ -7,4 +7,5 @@ jQuery(function($) {
 
     /* Bootstrap tooltips */
     $('.cinch-tooltip').click(function(e){e.preventDefault()}).tooltip();
+
 });
