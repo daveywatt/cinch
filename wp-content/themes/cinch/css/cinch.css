@@ -11,6 +11,10 @@ body {
     overflow: hidden;
 }
 
+#cinch-access-control li {
+    display: list-item;
+}
+
 .cinch-access-control {
     position: relative;
     width: 160px;
@@ -141,7 +145,7 @@ body {
     margin-bottom: 20px;
 }
 
-/* AdminOptions input fields */
+/* Options framework styles */
 .select2-container {
     min-width: 280px;
 }
@@ -175,4 +179,130 @@ body {
 
 .cinch-icon-help:before {
     content: "\f223";
+}
+
+.cinch-lock-button {
+    display: block;
+    height: 26px !important;
+}
+
+.cinch-icon-lock:before {
+    content: "\f160";
+    color: #dddddd;
+    font-size: 26px !important;
+}
+
+#cinch-access-options .submit {
+    float: right;
+    margin: 0;
+    padding: 0;
+}
+
+#cinch-access-options .cinch-access-control-item-handle:hover .cinch-lock-button:before {
+    color: #aaa;
+}
+
+.cinch-item-lock:hover .cinch-lock-button:before {
+    color: #777 !important;
+}
+
+.cinch-item-lock {
+    display: inline-block;
+    padding: 8px 5px 8px 0;
+}
+
+.cinch-state-locked .cinch-lock-button:before {
+    color: #FF0000 !important;
+}
+
+.cinch-state-locked:hover .cinch-lock-button:before {
+    color: #dddddd !important;
+}
+
+.cinch-no-labels .form-table th {
+    display: none;
+}
+
+.cinch-option-instruction-box {
+    font-size: 80%;
+    padding: 5px 12px 8px 12px;
+    background: #FBFBFB;
+    border: 1px solid #E5E5E5;
+    -webkit-box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+
+.cinch-options-box-wrapper {
+    margin-top: 10px;
+    background: #F5F5F5;
+    border: 1px solid #E5E5E5;
+    -webkit-box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+
+.cinch-options-box-body {
+    background: #FFF;
+    border-top-color: #FFF;
+    border-bottom-color: #DFDFDF;
+    padding: 12px;
+}
+
+.cinch-options-box-header,
+.cinch-options-box-footer {
+    padding: 12px 2%;
+    overflow: auto;
+    width: 96%
+}
+
+.cinch-options-box-header h3 {
+    float: left;
+    margin: 0;
+    line-height: 28px;
+}
+
+.cinch-options-box-footer span {
+    display: inline-block;
+    float: left;
+    font-size: 90%;
+    line-height: 28px;
+}
+
+.cinch-access-item .menu-item-settings,
+.cinch-access-sub-item .menu-item-settings {
+    display: none;
+}
+
+.cinch-access-sub-item {
+    width: 100%;
+}
+
+.cinch-access-sub-item .cinch-access-control-item-handle {
+    padding: 6px 12px;
+    width: 364px;
+    margin-right: 10px;
+}
+
+.cinch-access-sub-item .menu-item-settings {
+    width: 378px;
+}
+
+.cinch-access-sub-item .menu-item-settings .description {
+    width: 368px;
+}
+
+.cinch-access-item-toggle-child {
+    height: 34px !important;
+}
+
+.cinch-access-item-toggle-child:before {
+    line-height: 1.8 !important;
+}
+
+.cinch-access-sub-item .cinch-item-lock {
+    padding: 4px 5px 4px 0;
+}
+
+.cinch-access-sub-item .item-controls .cinch-icon-lock:before {
+    font-size: 21px !important;
+    line-height: 28px !important;
 }

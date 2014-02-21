@@ -1,6 +1,6 @@
 <?php
 /**
- * Class AdminOptions
+ * AdminOptions Class
  *
  * Streamlines the process of adding admin options to WordPress
  *
@@ -16,7 +16,6 @@ class AdminOptions extends Cinch
 
     function __construct($pages, $subpages = array(), $template = false, $options = array())
     {
-
         /* Add default initializer on theme activate */
         //TODO: do we need to load defaults into database?
 
@@ -26,26 +25,31 @@ class AdminOptions extends Cinch
         /* Construct class globals */
         $this->pages = $pages;
         $this->subpages = $subpages;
+        $this->active = null;
         $this->tabs = array();
-        $this->activeTab = false;
         $this->template = $template;
         $this->options = $options;
         $this->sections = array();
 
         /* Initialise pages */
         $this->pages($pages);
+    }
 
+    public function optionClass()
+    {
+        echo $this->active;
     }
 
     protected function pages($arguments)
     {
+        $this->active = (isset($_GET['page']) ? $_GET['page'] : $this->pages[key($this->pages)]['slug']);
 
         foreach ($arguments as $page)
         {
 
             //TODO: configure css icons properly (simply add class to menu maybe?)
             $icon = ((parent::checkValidArray($page['icon']) && $page['icon']['type'] == 'css') ? null : $page['icon']['reference']);
-            $callback = (($this->template && is_file($this->template)) ? array(&$this, 'template') : '');
+            $callback = ($this->template ? array(&$this, 'template') : null);
 
             $menuPage = add_menu_page($page['label'], $page['label'], $page['capability'], sanitize_title($page['slug'], $page['label']), $callback, $icon, $page['position']);
 
@@ -80,8 +84,9 @@ class AdminOptions extends Cinch
 
     protected function subpages($arguments)
     {
+        $this->active = (isset($_GET['page']) ? $_GET['page'] : $this->subpages[key($this->pages)]['slug']);
 
-        foreach ($arguments as $subpage)
+        foreach ($arguments as $index => $subpage)
         {
             /* Sanitize arguments */
             $subpage['slug'] = sanitize_title($subpage['slug'], $subpage['label']);
@@ -93,15 +98,19 @@ class AdminOptions extends Cinch
                     $this->tabs[$subpage['slug']] = $subpage;
                 break;
             }
-            $this->registerSection($subpage['id'], $subpage['label'], $subpage['slug']);
 
+            $label = ((isset($subpage['page_label']) && !$subpage['page_label']) ? null : $subpage['label']);
+
+            $this->registerSection($subpage['id'], $label, $subpage['slug']);
+
+            /* Reformat array key to reflect page slug */
+            $this->subpages[$subpage['slug']] = $subpage;
+            unset($this->subpages[$index]);
         }
-
     }
 
     protected function tabs()
     {
-
         /**
          * @function tabs
          * @params none
@@ -113,48 +122,41 @@ class AdminOptions extends Cinch
 
         if (!empty($this->tabs))
         {
-            $this->activeTab = (isset($_GET['tab']) ? $_GET['tab'] : $this->tabs[key($this->tabs)]['slug']);
+            $this->active = ($_GET['tab'] ? $_GET['tab'] : $this->tabs[key($this->tabs)]['slug']);
             ?>
 
-            <h2 class="nav-tab-wrapper">
-
+            <h2 class="cinch-tabs nav-tab-wrapper">
                 <?php
                 foreach($this->tabs as $tab)
-                    echo '<a href="?page='.$tab['page'].'&tab='.$tab['slug'].'" class="nav-tab'.($this->activeTab == $tab['slug'] ? ' nav-tab-active' : '').'">'.$tab['label'].'</a>'."\n";
+                    echo '<a href="?page='.$tab['page'].'&tab='.$tab['slug'].'" class="nav-tab'.($this->active == $tab['slug'] ? ' nav-tab-active' : '').'">'.$tab['label'].'</a>'."\n";
                 ?>
-
             </h2>
 
             <?php
         }
-
     }
 
     protected function options()
     {
+        $object = ((isset($this->tabs) && !empty($this->tabs)) ? $this->tabs : ((isset($this->subpages) && !empty($this->subpages)) ? $this->subpages : $this->pages));
+        $label = (isset($object[$this->active]['save']) ? $object[$this->active]['save'] : 'Save Options');
+        $class = ((isset($object[$this->active]['labels']) && !$object[$this->active]['labels']) ? 'cinch-no-labels' : '');
         ?>
-        <form method="post" action="options.php">
 
+        <form method="post" action="options.php" class="<?php echo $class; ?>">
             <?php
-
-            /* Are we using tabs? */
-            if ((isset($this->tabs) && !empty($this->tabs)) && isset($this->activeTab)) {
-                settings_fields($this->tabs[$this->activeTab]['id']);
-                do_settings_sections($this->tabs[$this->activeTab]['slug']);
-            }
-
+            settings_fields($object[$this->active]['id']);
+            do_settings_sections($object[$this->active]['slug']);
+            if ($label) submit_button($label);
             ?>
-
-            <?php submit_button('Save Options'); //TODO: allow relabel of submit button in option constructor ?>
-
         </form>
+
         <?php
     }
 
     public function template()
     {
-        $adminOptions = $this;
-        require($this->template);
+        parent::view($this->template, array('options' => $this));
     }
 
     public static function notices()
@@ -202,49 +204,21 @@ class AdminOptions extends Cinch
 
         $viewFile = (($option['type'] == 'custom' && isset($option['view'])) ? 'views/'.$option['view'].'.php' : 'views/fields/'.$option['type'].'.php');
         $optionView = parent::view($viewFile, array('option' => $option));
-        if (!$optionView) {
-            parent::$notices[] = array(
-                'message' => 'View file does not exist',
-                'error' => true
-            );
-        }
 
+        if (!$optionView) parent::$notices[] = array('message' => 'View file does not exist', 'error' => true);
 
-        /* Custom view requested? If so, we will call the view else use a field type */
-        /*if ($option['type'] == 'custom' && isset($option['view'])) {
+        /* Add help tooltips to view */
+        if (isset($option['help']) && $option['help'] != null)
+            echo '<a class="cinch-dashicon cinch-icon-help cinch-tooltip" data-toggle="tooltip" data-placement="top" title="'.$option['help'].'"><br /></a>';
 
-            /* Check for child template file and over-ride if exists  //TODO: should we use locate_template here?
-            $childViewPath = '/cinch/'.$option['view'].'.php';
-            $cinchViewPath = '/views/'.$option['view'].'.php';
-
-        } else {
-
-            /* Check for child template file and over-ride if exists  //TODO: should we use locate_template here?
-            $childViewPath = '/cinch/fields/'.$option['type'].'.php';
-            $cinchViewPath = '/views/fields/'.$option['type'].'.php';
-        }*/
 
         //TODO: capture view error here if it does not exist etc.
 
-        //$viewSource = ((CHILD_DIR && is_file(CHILD_DIR.$childViewPath)) ? CHILD_DIR.$childViewPath : CINCH_DIR.$cinchViewPath);
 
-        //TODO: tooltips on [help]
         //TODO: descriptions on fields
         //TODO: custom validation on inputs
         //TODO: sanitation on fields
 
-        if (isset($viewSource) && is_file($viewSource)) {
-
-            require($viewSource);
-
-            /* Add help tooltips to view */
-            if (isset($option['help']) && $option['help'] != null)
-                echo '<a class="cinch-dashicon cinch-icon-help cinch-tooltip" data-toggle="tooltip" data-placement="top" title="'.$option['help'].'"><br /></a>';
-
-            return true;
-        }
-
-return false;
     }
 
     public function loadOptions()
@@ -304,7 +278,6 @@ return false;
             }
 
         }
-
     }
 
     public function populateField($option) {

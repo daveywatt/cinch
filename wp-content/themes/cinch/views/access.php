@@ -1,7 +1,88 @@
-<div id="access-control-instructions">
-    <p><?=__('Select a menu page to disable client access to the relevant section.')?>
+<div id="access-control-instructions" class="cinch-option-instruction-box">
+    <p><?php _e('Select a menu page to disable client access to the relevant section.'); ?>
         <br />Use the <strong>CTRL</strong> key (Windows) or <strong>CMD &#8984;</strong> key (Mac) to deselect or select multiple items.</p>
 </div>
+
+<div id="cinch-access-options" class="cinch-options-box-wrapper">
+
+    <div class="cinch-options-box-header">
+        <h3><?php _e('Client Access Control'); ?></h3>
+        <?php submit_button('Save access settings'); ?>
+    </div>
+
+    <div class="cinch-options-box-body">
+
+        <ul class="cinch-access-item">
+
+            <li class="nav-menus-php menu-item">
+                <dl class="menu-item-bar">
+                    <dt class="menu-item-handle cinch-access-control-item-handle">
+                        <span class="item-title">
+                            <span class="menu-item-title">Dashboard</span>
+                        </span>
+                        <span class="item-controls">
+                            <span class="cinch-item-lock cinch-state-locked">
+                                <a class="cinch-dashicon cinch-icon-lock cinch-lock-button" title="<?php _e('Lock this page from client access'); ?>"><br /></a>
+                            </span>
+                            <a class="item-edit cinch-access-item-toggle-parent" id="" title="Toggle Settings" href="#">Toggle Settings</a>
+                        </span>
+                    </dt>
+                </dl>
+
+                <div class="menu-item-settings cinch-parent-settings" id="">
+
+                    <p class="description description-wide">
+                        <label for="">Menu Label</label>
+                        <input type="text" id="" name="" class="widefat edit-menu-item-title"  value="Dashboard">
+                    </p>
+
+                    <p class="description description-wide">
+
+                        <label for="edit-menu-item-title-10">Sub Items</label>
+
+                        <ul class="cinch-access-sub-item">
+                            <li class="nav-menus-php menu-item">
+                                <dl class="menu-item-bar">
+                                    <dt class="menu-item-handle cinch-access-control-item-handle">
+                                        <span class="item-title">
+                                            <span class="menu-item-title">Sub menu item</span>
+                                        </span>
+                                        <span class="item-controls">
+                                            <span class="cinch-item-lock cinch-state-locked">
+                                                <a class="cinch-dashicon cinch-icon-lock cinch-lock-button" title="<?php _e('Lock this page from client access'); ?>"><br /></a>
+                                            </span>
+                                            <a class="item-edit cinch-access-item-toggle-child" id="" title="Toggle Settings" href="#">Toggle Settings</a>
+                                        </span>
+                                    </dt>
+                                </dl>
+
+                                <div class="menu-item-settings cinch-child-settings" id="">
+                                    <p class="description description-wide">
+                                        <label for="">Menu Label</label>
+                                        <input type="text" id="" name="" class="widefat edit-menu-item-title"  value="Sub menu item">
+                                    </p>
+                                </div>
+                            </li>
+                        </ul>
+
+                    </p>
+
+                </div>
+            </li>
+        </ul>
+
+    </div>
+
+    <div class="cinch-options-box-footer">
+        <span>Administration pages restricted 3/10</span>
+        <?php submit_button('Save access settings'); ?>
+    </div>
+
+</div>
+
+
+
+
 
 <?php
 
@@ -10,7 +91,7 @@ global $submenu;
 
 /* Sort menu array as per option order, but only if menu is not set */
 $menuOperator = $menu;
-if (parent::checkValidOperator($option['current'])) {
+if (Cinch::checkValidOperator($option['current'])) {
     $menuOperator = array();
     foreach($option['current'] as $position => $menuItem) {
         /* Check for removed menu items */
@@ -22,7 +103,7 @@ if (parent::checkValidOperator($option['current'])) {
 
 $menuCounter = 0;
 ?>
-
+<!--
 <p><button id="access-control-clear" class="button button-secondary">Re-enable all</button></p>
 
 <div id="cinch-access-control">
@@ -84,7 +165,7 @@ $menuCounter = 0;
                                 <input type="hidden" name="<?=$option['id']?>[<?=$menuPosition?>][submenu][<?=$subMenuPosition?>][restricted]" class="item-is-restricted" value="<?=($isRestricted ? 'true' : 'false')?>" />
                                 <input type="hidden" name="<?=$option['id']?>[<?=$menuPosition?>][submenu][<?=$subMenuPosition?>][pointer]" value="<?=$subItemPointer?>" />
                                 <input type="hidden" name="<?=$option['id']?>[<?=$menuPosition?>][submenu][<?=$subMenuPosition?>][label]" class="item-label" value="<?=$subLabel?>" />
-                                <!-- <input type="hidden" name="<?=$option['id']?>[<?=$menuPosition?>][submenu][<?=$subMenuPosition?>][position]" class="item-position" value="<?=$subMenuPosition?>" /> -->
+                                <!-- <input type="hidden" name="<?=$option['id']?>[<?=$menuPosition?>][submenu][<?=$subMenuPosition?>][position]" class="item-position" value="<?=$subMenuPosition?>" />
                             </li>
 
                         <?php } ?>
@@ -101,6 +182,8 @@ $menuCounter = 0;
     ?>
 
 </div>
+
+-->
 
 <script>
 jQuery(function ($) {
